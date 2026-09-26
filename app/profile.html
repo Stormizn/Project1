@@ -8,6 +8,7 @@
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
     <link rel="stylesheet" href="../css/style.css">
 </head>
@@ -19,7 +20,7 @@
         <nav aria-label="App">
 <a href="dashboard.html">Dashboard</a>
             <a href="profile.html" class="active" aria-current="page">Profile</a>
-            <a href="#" id="signOutLink">Sign out</a>
+            <a href="../auth/login.html" id="signOutLink">Sign out</a>
         </nav>
     </div>
 </header>
@@ -27,6 +28,11 @@
 <main class="profile-page container">
 
     <a href="dashboard.html" class="back-link"><span aria-hidden="true">←</span> Back to dashboard</a>
+
+    <!-- Page-level status. Lives outside #editProfileCard, which is
+         hidden until "Edit profile" is clicked, so load errors are
+         actually visible. -->
+    <p id="profileStatus" class="form-message" role="status" aria-live="polite" style="margin-bottom: var(--s-5);"></p>
 
     <section class="masthead profile-header" data-reveal>
         <div class="avatar" id="profileAvatar">…</div>
@@ -136,8 +142,9 @@
 <script src="../js/script.js"></script>
 
 <!-- SUPABASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
 <script src="../js/auth-guard.js"></script>
 
 <!-- PROFILE LOGIC -->
@@ -145,16 +152,11 @@
     let currentUser = null;
 
     function showProfileMessage(text, isError) {
-        const message = document.getElementById("profileMessage");
-        message.textContent = text;
-        message.classList.remove("error", "success");
-        message.classList.add(isError ? "error" : "success");
-        message.style.display = "block";
+        setFormMessage(document.getElementById("profileMessage"), text, isError);
     }
 
-    // Supabase errors are already simple strings in `error.message`.
-    function getErrorMessage(err) {
-        return (err && err.message) || "Something went wrong. Please try again.";
+    function showProfileStatus(text, isError) {
+        setFormMessage(document.getElementById("profileStatus"), text, isError);
     }
 
     function getRoleLabel(role) {
@@ -243,8 +245,11 @@
         currentUser = auth.user;
 
         if (!auth.profile) {
-            showProfileMessage(
-                "Your profile could not be loaded. Please try signing in again.",
+            // Not a sign-out: the session is valid, the profile read
+            // failed. Say what actually went wrong.
+            console.error("Profile: profile unavailable", auth.error);
+            showProfileStatus(
+                "Your profile could not be loaded. Check your connection and reload.",
                 true
             );
             return;
@@ -267,7 +272,7 @@
     document.getElementById("cancelEditBtn")
         .addEventListener("click", closeEditForm);
 
-    // Save → update PocketBase, then re-render from fresh data
+    // Save to Supabase, then re-render from fresh data
     document.getElementById("saveProfileBtn")
         .addEventListener("click", async function () {
 
@@ -332,6 +337,8 @@
             event.preventDefault();
             signOut();
         });
+
+    watchSessionExpiry();
 
     loadProfile();
 

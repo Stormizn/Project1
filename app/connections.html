@@ -8,6 +8,7 @@
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
     <link rel="stylesheet" href="../css/style.css">
 </head>
@@ -18,7 +19,7 @@
     <aside class="sidebar">
         <a href="dashboard.html" class="logo dashboard-logo">Link<em>Up</em></a>
 
-        <div class="sidebar-inner">
+        <div class="sidebar-nav">
             <div class="nav-title">Platform</div>
             <nav class="dashboard-nav" aria-label="Platform">
                 <a href="dashboard.html"><span class="nav-icon">01</span><span>Dashboard</span></a>
@@ -31,7 +32,7 @@
             <div class="nav-title">Account</div>
             <nav class="dashboard-nav" aria-label="Account">
                 <a href="profile.html"><span class="nav-icon">07</span><span>Profile</span></a>
-                <a href="#" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
+                <a href="../auth/login.html" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
             </nav>
         </div>
 
@@ -101,24 +102,14 @@
 
 <script src="../js/script.js"></script>
 
-<!-- POCKETBASE SDK + SHARED CONFIG + AUTH GUARD -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- SUPABASE SDK + SHARED CONFIG + AUTH GUARD -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
 <script src="../js/auth-guard.js"></script>
 
 <!-- CONNECTIONS LOGIC -->
 <script>
-
-    // Supabase returns PostgrestError: message, details, hint, code.
-    function getErrorMessage(err) {
-        if (!err) return "Something went wrong. Please try again.";
-
-        const message = (err.message || "").trim();
-        const hint = (err.hint || "").trim();
-
-        if (message && hint) return message + " " + hint;
-        return message || hint || "Something went wrong. Please try again.";
-    }
 
     function showMessage(text, isError) {
         const m = document.getElementById("connectionsMessage");
@@ -130,22 +121,6 @@
 
     function hideMessage() {
         document.getElementById("connectionsMessage").style.display = "none";
-    }
-
-    function formatDate(value) {
-        if (!value) return "Date TBA";
-        const d = new Date(value);
-        if (isNaN(d.getTime())) return "Date TBA";
-        return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-    }
-
-    function statusLabel(status) {
-        switch (status) {
-            case "accepted": return "Accepted";
-            case "rejected": return "Declined";
-            case "archived": return "Archived";
-            default: return "Pending";
-        }
     }
 
     function renderPlannerView(rows) {
@@ -165,7 +140,7 @@
 
         rows.forEach(function (conn) {
             const brand = conn.from_user || {};
-            const opp = conn.opportunity || {};
+            const opp = conn.opportunity_id || {};
             const brandName = brand.name ? brand.name.trim() : "A brand";
             const brandOrg = brand.organization_name
                 ? brand.organization_name.trim()
@@ -186,7 +161,7 @@
                 conn.status === "accepted" ? "status--accepted" :
                 conn.status === "rejected" ? "status--rejected" : "status--pending"
             );
-            status.textContent = statusLabel(conn.status);
+            status.textContent = connectionStatusLabel(conn.status);
             head.appendChild(status);
 
             row.appendChild(head);
@@ -195,7 +170,6 @@
             meta.className = "muted";
             meta.textContent = (opp.title || "Opportunity") + " · " + brandOrg;
             row.appendChild(meta);
-
             if (conn.status === "pending") {
                 const actions = document.createElement("div");
                 actions.className = "btn-row";
@@ -214,6 +188,20 @@
 
                 actions.appendChild(accept);
                 actions.appendChild(decline);
+                row.appendChild(actions);
+            } else if (conn.status === "accepted") {
+                // Messages are keyed to a connection and the INSERT
+                // policy requires status = 'accepted', so this is the
+                // only state where the thread can actually be used.
+                const actions = document.createElement("div");
+                actions.className = "btn-row";
+
+                const message = document.createElement("a");
+                message.className = "btn btn-ghost btn-sm";
+                message.href = "messages.html?connection=" + encodeURIComponent(conn.id);
+                message.textContent = "Message";
+                actions.appendChild(message);
+
                 row.appendChild(actions);
             }
 
@@ -237,7 +225,7 @@
         count.textContent = rows.length + (rows.length === 1 ? " request" : " requests");
 
         rows.forEach(function (conn) {
-            const opp = conn.opportunity || {};
+            const opp = conn.opportunity_id || {};
             const planner = conn.to_user || {};
 
             const row = document.createElement("article");
@@ -255,7 +243,7 @@
                 conn.status === "accepted" ? "status--accepted" :
                 conn.status === "rejected" ? "status--rejected" : "status--pending"
             );
-            status.textContent = statusLabel(conn.status);
+            status.textContent = connectionStatusLabel(conn.status);
             head.appendChild(status);
 
             row.appendChild(head);
@@ -265,6 +253,19 @@
             meta.textContent = "Requested from " +
                 ((planner && planner.name) || "the planner") + " · " + formatDate(conn.created_at);
             row.appendChild(meta);
+
+            if (conn.status === "accepted") {
+                const actions = document.createElement("div");
+                actions.className = "btn-row";
+
+                const message = document.createElement("a");
+                message.className = "btn btn-ghost btn-sm";
+                message.href = "messages.html?connection=" + encodeURIComponent(conn.id);
+                message.textContent = "Message";
+                actions.appendChild(message);
+
+                row.appendChild(actions);
+            }
 
             list.appendChild(row);
         });
@@ -291,6 +292,15 @@
         if (auth === null) return;
 
         const profile = auth.profile;
+
+        if (!profile) {
+            showMessage(
+                "Your profile could not be loaded. Check your connection and reload.",
+                true
+            );
+            return;
+        }
+
         const fullName = profile.name ? profile.name.trim() : "";
         const displayName = getDisplayName(auth);
 
@@ -313,29 +323,11 @@
             if (error) throw error;
 
             if (isPlanner) {
-                // In Supabase we already joined the related rows as objects
-                // However, to keep compatibility with render logic, map them into an 'expand' object
-                const mappedRows = (mine || []).map(r => ({
-                    ...r,
-                    expand: {
-                        from_user: r.from_user,
-                        to_user: r.to_user,
-                        opportunity: r.opportunity_id
-                    },
-                    opportunity: r.opportunity_id
-                }));
-                renderPlannerView(mappedRows);
+                // from_user / to_user / opportunity_id already arrive
+                // as embedded objects from the select above.
+                renderPlannerView(mine || []);
             } else {
-                const mappedRows = (mine || []).map(r => ({
-                    ...r,
-                    expand: {
-                        from_user: r.from_user,
-                        to_user: r.to_user,
-                        opportunity: r.opportunity_id
-                    },
-                    opportunity: r.opportunity_id
-                }));
-                renderBrandView(mappedRows);
+                renderBrandView(mine || []);
             }
         } catch (err) {
             const target = isPlanner ? "connectionCount" : "brandRequestCount";
@@ -348,6 +340,8 @@
         event.preventDefault();
         signOut();
     });
+
+    watchSessionExpiry();
 
     renderView().catch(function (error) {
         console.error("Connections failed:", error);

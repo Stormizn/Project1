@@ -8,6 +8,7 @@
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
     <link rel="stylesheet" href="../css/style.css">
 </head>
@@ -124,7 +125,7 @@
 
                     <div class="check terms">
                         <input type="checkbox" id="terms" required>
-                        <label for="terms">I agree to the LinkUp <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</label>
+                        <label for="terms">I agree to the LinkUp <a href="../legal.html" target="_blank" rel="noopener">Terms</a> and <a href="../legal.html" target="_blank" rel="noopener">Privacy Policy</a>.</label>
                     </div>
 
                     <button type="submit" class="btn btn-primary btn-block create-account-btn">Create Account →</button>
@@ -142,7 +143,7 @@
 <script src="../js/script.js"></script>
 
 <!-- SUPABASE SDK (must load before the shared config) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 <!-- SHARED SUPABASE CONFIG -->
 <script src="../js/supabase.js"></script>
@@ -258,9 +259,28 @@
             showSignupMessage("Creating your account...", false);
 
             // 4. Create the user in Supabase Auth
+            //
+            // We pass the profile details in `options.data`. Supabase
+            // stores these as user metadata, and the database trigger
+            // `handle_new_user()` uses them to create the public.users
+            // row for us.
+            //
+            // The browser used to insert that row itself, which only
+            // worked if we already had a session. So signup broke
+            // whenever "Confirm email" was switched on in the Supabase
+            // dashboard. Letting the database do it works either way.
             const { data: authData, error: authError } = await window.supabaseClient.auth.signUp({
                 email: email,
                 password: password,
+                options: {
+                    data: {
+                        name: fullName,
+                        role: role,
+                        organization_name: organizationName,
+                        location: location,
+                        category: categoryValue
+                    }
+                }
             });
 
             if (authError) {
@@ -270,35 +290,32 @@
                 return;
             }
 
-            // 5. Create the public profile record in our `users` table
-            if (authData.user) {
-                const { error: profileError } = await window.supabaseClient
-                    .from('users')
-                    .insert([
-                        {
-                            id: authData.user.id,
-                            name: fullName,
-                            role: role,
-                            organization_name: organizationName,
-                            category: categoryValue,
-                            location: location
-                        }
-                    ]);
-
-                if (profileError) {
-                    showSignupMessage("Profile creation failed: " + profileError.message, true);
-                    submitButton.disabled = false;
-                    submitButton.textContent = "Create Account →";
-                    return;
-                }
+            // 5. Did we get signed in straight away?
+            //
+            // `session` is filled in automatically when email
+            // confirmation is switched OFF. If it is missing, the
+            // account exists but the user must confirm their email
+            // before they can sign in.
+            if (authData.session) {
+                showSignupMessage("Account created! Taking you to your dashboard...", false);
+                setTimeout(function () {
+                    window.location.href = "../app/dashboard.html";
+                }, 1200);
+                return;
             }
 
-            // 6. Success - Move on to the login page.
-            showSignupMessage("Account created! Sign in to continue.", false);
+            // 6. Email confirmation is ON — ask the user to confirm.
+            showSignupMessage(
+                "Almost there! Check your inbox and click the confirmation " +
+                "link, then sign in.",
+                false
+            );
+            submitButton.disabled = false;
+            submitButton.textContent = "Create Account →";
 
-            setTimeout(function() {
+            setTimeout(function () {
                 window.location.href = "login.html?created=1";
-            }, 1200);
+            }, 2600);
         });
     </script>
 

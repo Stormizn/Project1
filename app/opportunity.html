@@ -8,6 +8,7 @@
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
     <link rel="stylesheet" href="../css/style.css">
 </head>
@@ -31,7 +32,7 @@
             <div class="nav-title">Account</div>
             <nav class="dashboard-nav" aria-label="Account">
                 <a href="profile.html"><span class="nav-icon">07</span><span>Profile</span></a>
-                <a href="#" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
+                <a href="../auth/login.html" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
             </nav>
         </div>
 
@@ -115,9 +116,10 @@
 
 <script src="../js/script.js"></script>
 
-<!-- POCKETBASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- SUPABASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
 <script src="../js/auth-guard.js"></script>
 
 <!-- OPPORTUNITY LOGIC -->
@@ -125,32 +127,11 @@
 <script>
 
     function showOppMessage(text, isError) {
-        const message = document.getElementById("interestMessage");
-        message.textContent = text;
-        message.classList.remove("error", "success");
-        message.classList.add(isError ? "error" : "success");
-        message.style.display = "block";
+        setFormMessage(document.getElementById("interestMessage"), text, isError);
     }
 
     function hideOppMessage() {
-        const message = document.getElementById("interestMessage");
-        message.style.display = "none";
-    }
-
-    function formatDate(value) {
-        if (!value) return "Date TBA";
-        const d = new Date(value);
-        if (isNaN(d.getTime())) return "Date TBA";
-        return d.toLocaleDateString("en-IN", {
-            day: "numeric",
-            month: "short",
-            year: "numeric"
-        });
-    }
-
-    // Supabase errors are already simple strings in `error.message`.
-    function getErrorMessage(err) {
-        return (err && err.message) || "Something went wrong. Please try again.";
+        hideFormMessage(document.getElementById("interestMessage"));
     }
 
     function renderOpportunity(opp, profile) {
@@ -166,8 +147,9 @@
             opp.title || "Untitled opportunity";
 
         const statusEl = document.getElementById("oppStatus");
-        statusEl.textContent = opp.status === "open" ? "Open" : "Closed";
-        statusEl.classList.toggle("status--pending", opp.status !== "open");
+        statusEl.textContent = opportunityStatusLabel(opp.status);
+        statusEl.classList.toggle("status--accepted", opp.status === "open");
+        statusEl.classList.toggle("status--rejected", opp.status !== "open");
 
         document.getElementById("oppType").textContent = opp.type || "—";
         document.getElementById("oppBudget").textContent =
@@ -193,6 +175,19 @@
         const interestNote = document.getElementById("interestNote");
 
         if (profile.role === "brand") {
+            const isOpen = opp.status === "open";
+
+            if (!isOpen) {
+                // The button used to show for closed opportunities too,
+                // which produced a raw Postgres unique-constraint error
+                // the moment a brand clicked it twice.
+                interestNote.textContent =
+                    "This opportunity is closed, so it is not accepting interest right now. " +
+                    "Browse Discover for open ones.";
+                interestActions.style.display = "none";
+                return;
+            }
+
             interestNote.textContent =
                 "Tell the organizer you'd like to collaborate on this opportunity. " +
                 "They'll see your interest as a pending request.";
@@ -213,7 +208,20 @@
                             status: "pending"
                         }]);
 
-                    if (error) throw error;
+                    if (error) {
+                        // 23505 = the unique index on
+                        // (from_user, to_user, opportunity_id) already
+                        // has this row. Say so instead of dumping a
+                        // Postgres constraint name at the user.
+                        if (error.code === "23505") {
+                            showOppMessage(
+                                "You have already sent interest for this opportunity.",
+                                true
+                            );
+                            return;
+                        }
+                        throw error;
+                    }
                 } catch (err) {
                     showOppMessage("Could not send interest: " + getErrorMessage(err), true);
                     interestBtn.disabled = false;
@@ -232,12 +240,21 @@
             interestActions.style.display = "none";
         }
     }
-
     async function loadOpportunity() {
         const auth = await requireSession();
         if (auth === null) return;
 
         const profile = auth.profile;
+
+        if (!profile) {
+            console.error("Opportunity: profile unavailable", auth.error);
+            document.getElementById("oppTitle").textContent = "Profile unavailable";
+            document.getElementById("oppStatus").textContent = "";
+            document.getElementById("interestNote").textContent =
+                "Your profile could not be loaded. Reload the page to try again.";
+            return;
+        }
+
         const fullName = profile.name ? profile.name.trim() : "";
         const displayName = getDisplayName(auth);
 
@@ -257,7 +274,9 @@
         if (!oppId) {
             document.getElementById("oppTitle").textContent = "No opportunity selected";
             document.getElementById("oppStatus").textContent = "";
-            document.getElementById("opportunityContainer").querySelector(".profile-card").firstElementChild.nextElementSibling.hidden = true;
+            // Hide every detail row, not just the first one.
+            document.querySelectorAll("#opportunityContainer .info-row")
+                .forEach(function (row) { row.hidden = true; });
             document.getElementById("interestNote").textContent =
                 "This page needs an opportunity id in the URL. Head back to Discover and open a listing.";
             return;
@@ -273,12 +292,9 @@
 
             if (error) throw error;
 
-            // Map objects for compatibility
-            opp = {
-                ...data,
-                event_id: data.event_id,
-                organizer_id: data.organizer_id
-            };
+            // `event_id(*)` and `organizer_id(*)` already arrive as
+            // embedded objects — no mapping needed.
+            opp = data;
         } catch (err) {
             document.getElementById("oppTitle").textContent = "Opportunity not found";
             document.getElementById("oppStatus").textContent = "";
@@ -296,6 +312,8 @@
             event.preventDefault();
             signOut();
         });
+
+    watchSessionExpiry();
 
     loadOpportunity().catch(function (error) {
         console.error("Opportunity failed to load:", error);

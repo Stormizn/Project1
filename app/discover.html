@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Discover Events | LinkUp</title>
     <script>document.documentElement.classList.add("js");</script>
-    <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
     <link rel="stylesheet" href="../css/style.css">
 </head>
@@ -32,7 +32,7 @@
             <div class="nav-title">Account</div>
             <nav class="dashboard-nav" aria-label="Account">
                 <a href="profile.html"><span class="nav-icon">07</span><span>Profile</span></a>
-                <a href="#" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
+                <a href="../auth/login.html" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
             </nav>
         </div>
 
@@ -56,11 +56,11 @@
             </div>
             <div class="topbar-actions">
                 <label class="search-box">
-                    <span class="visually-hidden">Search events</span>
+                    <span class="visually-hidden">Search the directory</span>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.25" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                    <input type="text" id="searchInput" placeholder="Search events &amp; opportunities…">
+                    <input type="text" id="searchInput" placeholder="Search events, opportunities &amp; brands…">
                 </label>
-                <button class="icon-btn notification" type="button" aria-label="Notifications">
+                <button class="icon-btn notification" type="button" aria-label="Notifications (not available yet)" title="Notifications are not available yet" disabled>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6.5a4 4 0 118 0v3l1.25 2H2.75L4 9.5v-3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.4"/></svg>
                 </button>
             </div>
@@ -177,6 +177,19 @@
             <div class="opportunity-grid" id="eventGrid"></div>
         </section>
 
+        <section class="dash-section" id="brandsSection" style="display: none;">
+            <div class="section-header">
+                <h2>Brands on LinkUp</h2>
+                <div class="section-header-meta">
+                    <span class="stamp stamp--live" id="brandCount">Loading&hellip;</span>
+                </div>
+            </div>
+            <p class="muted" id="brandEmpty" style="display: none; font-size: var(--fs-sm);">
+                No brands have joined yet. They will appear here as soon as one signs up.
+            </p>
+            <div class="opportunity-grid" id="brandGrid"></div>
+        </section>
+
         <section class="dash-section" id="opportunitiesSection">
             <div class="section-header">
                 <h2>Open opportunities</h2>
@@ -198,9 +211,10 @@
 
 <script src="../js/script.js"></script>
 
-<!-- POCKETBASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- SUPABASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
 <script src="../js/auth-guard.js"></script>
 
 <!-- DISCOVER LOGIC -->
@@ -209,25 +223,10 @@
 
     var allEvents = [];
     var allOpportunities = [];
+    var allBrands = [];
 
-    function formatDate(value) {
-        if (!value) return "Date TBA";
-        var d = new Date(value);
-        if (isNaN(d.getTime())) return "Date TBA";
-        return d.toLocaleDateString("en-IN", {
-            day: "numeric",
-            month: "short",
-            year: "numeric"
-        });
-    }
-
-    function escapeHtml(text) {
-        return String(text == null ? "" : text)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;");
-    }
+    // The signed-in user's own profile id, used when publishing.
+    var currentProfileId = null;
 
     function renderEvents(list) {
         var grid = document.getElementById("eventGrid");
@@ -378,6 +377,60 @@
         });
     }
 
+    // Brands directory — only event planners get this, which is why the
+    // dashboard relabels the nav item to "Discover Brands" for them.
+    function renderBrands(list) {
+        var grid = document.getElementById("brandGrid");
+        var section = document.getElementById("brandsSection");
+        var count = document.getElementById("brandCount");
+        var empty = document.getElementById("brandEmpty");
+
+        grid.innerHTML = "";
+
+        if (!list.length) {
+            empty.style.display = "block";
+            count.textContent = "0 brands";
+            return;
+        }
+
+        empty.style.display = "none";
+        count.textContent = plural(list.length, "brand");
+
+        list.forEach(function (item) {
+            var card = document.createElement("article");
+            card.className = "opportunity-card";
+
+            var pill = document.createElement("span");
+            pill.className = "opportunity-type";
+            pill.textContent = item.category || "Brand";
+
+            var h3 = document.createElement("h3");
+            h3.textContent = item.organization_name || item.name || "Unnamed brand";
+
+            var who = document.createElement("p");
+            who.textContent = item.name ? "Contact: " + item.name : "Brand account";
+
+            var desc = document.createElement("p");
+            desc.textContent = item.description || "No description provided yet.";
+
+            var details = document.createElement("div");
+            details.className = "opportunity-details";
+
+            var spanLocation = document.createElement("span");
+            spanLocation.textContent = item.location || "Location TBA";
+
+            details.appendChild(spanLocation);
+
+            card.appendChild(pill);
+            card.appendChild(h3);
+            card.appendChild(who);
+            card.appendChild(desc);
+            card.appendChild(details);
+
+            grid.appendChild(card);
+        });
+    }
+
     function applyFilter() {
         var query = document.getElementById("searchInput").value.trim().toLowerCase();
 
@@ -394,6 +447,7 @@
         if (!query) {
             renderEvents(allEvents);
             renderOpportunities(allOpportunities);
+            if (allBrands.length) renderBrands(allBrands);
             return;
         }
 
@@ -412,6 +466,16 @@
             function (item) { return item.audience; },
             function (item) { return item.event_id && item.event_id.name; }
         ]));
+
+        if (allBrands.length) {
+            renderBrands(searchList(allBrands, [
+                function (item) { return item.name; },
+                function (item) { return item.organization_name; },
+                function (item) { return item.category; },
+                function (item) { return item.location; },
+                function (item) { return item.description; }
+            ]));
+        }
     }
 
     async function renderDiscover() {
@@ -419,8 +483,17 @@
         if (auth === null) return;
 
         const profile = auth.profile;
+
+        if (!profile) {
+            console.error("Discover: profile unavailable", auth.error);
+            document.getElementById("eventCount").textContent = "Profile unavailable";
+            document.getElementById("opportunityCount").textContent = "Profile unavailable";
+            return;
+        }
+
         const fullName = profile.name ? profile.name.trim() : "";
         const displayName = getDisplayName(auth);
+        currentProfileId = profile.id;
 
         document.getElementById("sidebarAvatar").textContent =
             getInitials(fullName || "LinkUp User");
@@ -435,27 +508,222 @@
             "Discover events";
         document.getElementById("discoverDescription").textContent =
             profile.role === "event_planner"
-                ? "Browse events published by planners to find partnership opportunities."
+                ? "Browse the brands looking for partners, and see what other planners are running."
                 : "Find events and open opportunities from the LinkUp network.";
 
-        var createCta = document.getElementById("createCta");
-        var createNotice = document.getElementById("createNotice");
-        var createCtaBtn = document.getElementById("createCtaBtn");
+        // CREATE EVENT / OPPORTUNITY
+    // Only event planners can publish, so this whole panel is
+    // hidden from brands. The database enforces the same rule
+    // through Row Level Security — this is only the UI half.
+    var createCta = document.getElementById("createCta");
+    var createNotice = document.getElementById("createMessage");
+    var createCtaBtn = document.getElementById("createCtaBtn");
+    var createPanel = document.getElementById("createPanel");
+    var eventSelect = document.getElementById("oppEventSelect");
+    var noOwnEventsNote = document.getElementById("noOwnEventsNote");
 
-        if (profile.role === "event_planner") {
-            createCta.style.display = "block";
-            createNotice.textContent =
-                "Creating events and opportunities opens in the next phase. " +
-                "You can create events and publish partnership opportunities there.";
-            createNotice.style.display = "block";
-            createCtaBtn.addEventListener("click", function () {
-                createNotice.textContent =
-                    "The create form ships in the next phase. " +
-                    "You'll be able to add events and opportunities here.";
-            });
-        } else {
-            createCta.style.display = "none";
+    // Local alias so the create-form handlers read the same as before.
+    // `hideFormMessage` is the shared global from js/utils.js.
+    function showFormMessage(el, text, isError) {
+        setFormMessage(el, text, isError);
+    }
+
+    function resetButton(btn, label) {
+        btn.disabled = false;
+        btn.textContent = label;
+    }
+
+    // The <select> can only offer events this planner owns, so
+    // fill it from the events already loaded on the page.
+    function refreshEventSelect() {
+        var mine = allEvents.filter(function (e) {
+            return e.organizer_id && e.organizer_id.id === currentProfileId;
+        });
+
+        eventSelect.innerHTML = "";
+
+        if (!mine.length) {
+            var blank = document.createElement("option");
+            blank.value = "";
+            blank.textContent = "No events yet";
+            eventSelect.appendChild(blank);
+            eventSelect.disabled = true;
+            noOwnEventsNote.style.display = "block";
+            return;
         }
+
+        var first = document.createElement("option");
+        first.value = "";
+        first.textContent = "Choose an event…";
+        eventSelect.appendChild(first);
+
+        mine.forEach(function (e) {
+            var opt = document.createElement("option");
+            opt.value = e.id;
+            opt.textContent = e.name;
+            eventSelect.appendChild(opt);
+        });
+
+        eventSelect.disabled = false;
+        noOwnEventsNote.style.display = "none";
+    }
+
+    createCtaBtn.addEventListener("click", function () {
+        var isOpen = createPanel.style.display !== "none";
+        createPanel.style.display = isOpen ? "none" : "block";
+        createCtaBtn.textContent = isOpen
+            ? "+ Create event / opportunity"
+            : "Close create form";
+        hideFormMessage(createNotice);
+    });
+
+    // --- Create event ---
+    document.getElementById("createEventForm").addEventListener("submit", async function (event) {
+        event.preventDefault();
+        hideFormMessage(createNotice);
+
+        var eventMessage = document.getElementById("eventFormMessage");
+        var saveBtn = document.getElementById("saveEventBtn");
+        hideFormMessage(eventMessage);
+
+        var name = document.getElementById("eventName").value.trim();
+        if (!name) {
+            showFormMessage(eventMessage, "Please enter an event name.", true);
+            return;
+        }
+
+        // events.event_date is a DATE column, but the input gives us
+        // "2026-03-01T18:30". Send only the date part.
+        var rawDate = document.getElementById("eventDate").value;
+        var eventDate = rawDate ? rawDate.split("T")[0] : null;
+
+        var capacityRaw = document.getElementById("eventCapacity").value.trim();
+        var capacity = capacityRaw === "" ? null : parseInt(capacityRaw, 10);
+        if (capacity !== null && (isNaN(capacity) || capacity < 0)) {
+            showFormMessage(eventMessage, "Capacity must be a positive number.", true);
+            return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Publishing…";
+
+        var payload = {
+            name: name,
+            category: document.getElementById("eventCategory").value.trim() || null,
+            location: document.getElementById("eventLocation").value.trim() || null,
+            event_date: eventDate,
+            capacity: capacity,
+            description: document.getElementById("eventDescription").value.trim() || null,
+            organizer_id: currentProfileId
+        };
+
+        try {
+            var result = await window.supabaseClient
+                .from("events")
+                .insert([payload])
+                .select()
+                .single();
+
+            if (result.error) throw result.error;
+
+            // Splice it in so the grid and the select update without
+            // a full reload.
+            allEvents.push(result.data);
+            refreshEventSelect();
+            applyFilter();
+
+            document.getElementById("createEventForm").reset();
+            showFormMessage(eventMessage, "Event published.", false);
+            showFormMessage(createNotice, "Your event is now live on Discover.", false);
+        } catch (err) {
+            showFormMessage(eventMessage, "Could not publish: " + getErrorMessage(err), true);
+        }
+
+        resetButton(saveBtn, "Publish event");
+    });
+
+    // --- Create opportunity ---
+    document.getElementById("createOpportunityForm").addEventListener("submit", async function (event) {
+        event.preventDefault();
+        hideFormMessage(createNotice);
+
+        var oppMessage = document.getElementById("oppFormMessage");
+        var saveBtn = document.getElementById("saveOpportunityBtn");
+        hideFormMessage(oppMessage);
+
+        var eventId = eventSelect.value;
+        if (!eventId) {
+            showFormMessage(oppMessage, "Publish an event first, then attach an opportunity to it.", true);
+            return;
+        }
+
+        var title = document.getElementById("oppTitle").value.trim();
+        if (!title) {
+            showFormMessage(oppMessage, "Please enter a title.", true);
+            return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Publishing…";
+
+        var payload = {
+            title: title,
+            type: document.getElementById("oppType").value.trim() || null,
+            budget: document.getElementById("oppBudget").value.trim() || null,
+            audience: document.getElementById("oppAudience").value.trim() || null,
+            description: document.getElementById("oppDescription").value.trim() || null,
+            status: "open",
+            event_id: eventId,
+            organizer_id: currentProfileId
+        };
+
+        try {
+            var result = await window.supabaseClient
+                .from("opportunities")
+                .insert([payload])
+                .select("*, event_id(*), organizer_id(*)")
+                .single();
+
+            if (result.error) throw result.error;
+
+            allOpportunities.push(result.data);
+
+            document.getElementById("createOpportunityForm").reset();
+            refreshEventSelect();
+            applyFilter();
+            showFormMessage(oppMessage, "Opportunity published.", false);
+            showFormMessage(createNotice, "Your opportunity is now visible to brands.", false);
+        } catch (err) {
+            showFormMessage(oppMessage, "Could not publish: " + getErrorMessage(err), true);
+        }
+
+        resetButton(saveBtn, "Publish opportunity");
+    });
+
+    if (profile.role === "event_planner") {
+        createCta.style.display = "block";
+
+        // The brands directory is the reason the dashboard renames
+        // this nav item to "Discover Brands" for planners.
+        try {
+            const { data, error } = await window.supabaseClient
+                .from("users")
+                .select("id, name, organization_name, location, category, description")
+                .eq("role", "brand")
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+
+            allBrands = data || [];
+            document.getElementById("brandsSection").style.display = "";
+            renderBrands(allBrands);
+        } catch (err) {
+            console.error("Could not load brands:", err);
+            document.getElementById("brandCount").textContent = "Could not load brands";
+        }
+    } else {
+        createCta.style.display = "none";
+    }
 
         try {
             const { data, error } = await window.supabaseClient
@@ -482,27 +750,14 @@
             document.getElementById("opportunityCount").textContent = "Could not load opportunities";
         }
 
-        // Keep compatibility with PocketBase expand format used by render logic
-        const mappedEvents = allEvents.map(e => ({
-            ...e,
-            expand: {
-                organizer_id: e.organizer_id
-            },
-            organizer_id: e.organizer_id
-        }));
+        // The select above already embeds the related rows as objects
+        // (organizer_id(*), event_id(*)), so the render functions can
+        // read item.organizer_id.name directly. No mapping needed.
+        applyFilter();
 
-        const mappedOpportunities = allOpportunities.map(o => ({
-            ...o,
-            expand: {
-                event_id: o.event_id,
-                organizer_id: o.organizer_id
-            },
-            event_id: o.event_id,
-            organizer_id: o.organizer_id
-        }));
-
-        renderEvents(mappedEvents);
-        renderOpportunities(mappedOpportunities);
+        // Now that the events are loaded we can offer this planner's
+        // own events in the "attach an opportunity" dropdown.
+        if (profile.role === "event_planner") refreshEventSelect();
     }
 
     document.getElementById("searchInput")
@@ -513,6 +768,8 @@
             event.preventDefault();
             signOut();
         });
+
+    watchSessionExpiry();
 
     renderDiscover().catch(function (error) {
         console.error("Discover failed to load:", error);

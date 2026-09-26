@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="theme-color" content="#FFEFB3">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy &amp; Terms | LinkUp</title>
+    <script>document.documentElement.classList.add("js");</script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+    <nav class="navbar container" aria-label="Main">
+        <a href="index.html" class="logo">Link<em>Up</em></a>
+        <ul class="nav-links">
+            <li><a href="index.html#opportunities">Opportunities</a></li>
+            <li><a href="index.html#how-it-works">How it works</a></li>
+            <li><a href="index.html#about">About</a></li>
+        </ul>
+        <div class="nav-buttons">
+            <a href="auth/login.html" class="btn btn-quiet btn-sm">Log in</a>
+            <a href="auth/signup.html" class="btn btn-primary btn-sm">Get started</a>
+        </div>
+    </nav>
+</header>
+
+<main class="section container">
+
+    <p class="eyebrow eyebrow--rule" data-reveal>Legal</p>
+    <h1 class="h1" data-reveal>Privacy &amp; <em>terms.</em></h1>
+    <p class="lede" data-reveal style="margin-top: var(--s-5);">
+        Last updated 26 September 2026. This is a student project, not a legal
+        document &mdash; it describes what the code actually does.
+    </p>
+
+    <div class="profile-grid" style="margin-top: var(--s-8);">
+
+        <section class="profile-card" data-reveal>
+            <div class="profile-card-head"><h2>What we store</h2></div>
+
+            <div class="info-row">
+                <span class="info-label">Account</span>
+                <span class="info-value">
+                    Your email address and password, held by Supabase Auth. The
+                    password is hashed and is never readable by this site.
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">Profile</span>
+                <span class="info-value">
+                    Your name, role (brand or event planner), organization, location,
+                    category and description. Stored in the <code>public.users</code>
+                    table.
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">Listings</span>
+                <span class="info-value">
+                    Events and opportunities you publish, including name, date,
+                    location, capacity, budget and description.
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">Connections</span>
+                <span class="info-value">
+                    Which opportunities you expressed interest in, and whether the
+                    other side accepted.
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">Messages</span>
+                <span class="info-value">
+                    Messages you send to, and receive from, the brands and planners
+                    you are connected with. A thread only exists on an accepted
+                    connection, and only the two people on that connection can read
+                    it. You can delete a message you sent.
+                </span>
+            </div>
+
+
+            <div class="info-row">
+                <span class="info-label">Tracking</span>
+                <span class="info-value">
+                    None. There is no analytics, no advertising and no third-party
+                    tracking script on this site.
+                </span>
+            </div>
+        </section>
+
+        <section class="profile-card" data-reveal>
+            <div class="profile-card-head"><h2>Who can see what</h2></div>
+
+            <p style="font-size: var(--fs-sm); color: var(--ink-2);">
+                Row Level Security is enabled on every table, and the rules are in
+                <code>supabase-schema.sql</code>. In plain terms:
+            </p>
+
+            <ul style="display: flex; flex-direction: column; gap: var(--s-3); font-size: var(--fs-sm); color: var(--ink-2);">
+                <li><strong>Signed out:</strong> nothing. Every table rejects anonymous reads.</li>
+                <li><strong>Signed in:</strong> all profiles, events and opportunities. The public
+                    <code>users</code> table holds no email, phone or other private field &mdash;
+                    your email lives only in Supabase Auth.</li>
+                <li><strong>Your own rows:</strong> only you can edit your profile, and only the
+                    organizer can edit or delete their own events and opportunities.</li>
+                <li><strong>Connections:</strong> only the two parties involved can see a connection.</li>
+                <li><strong>Messages:</strong> only the two parties on that connection can read the
+                    thread, and a message can only be sent once the connection is accepted. A sender
+                    cannot edit a message after sending it.</li>
+            </ul>
+
+            <p style="font-size: var(--fs-sm); color: var(--ink-2); margin-top: var(--s-5);">
+                You can edit or delete your profile data at any time from your
+                <a href="app/profile.html" style="text-decoration: underline;">profile page</a>.
+            </p>
+        </section>
+
+        <section class="profile-card" data-reveal>
+            <div class="profile-card-head"><h2>Terms of use</h2></div>
+
+            <p style="font-size: var(--fs-sm); color: var(--ink-2);">
+                LinkUp connects brands with event planners. By using it you agree to:
+            </p>
+
+            <ul style="display: flex; flex-direction: column; gap: var(--s-3); font-size: var(--fs-sm); color: var(--ink-2);">
+                <li>Only publish events and opportunities that are real.</li>
+                <li>Do not impersonate another brand or organisation.</li>
+                <li>Do not use the site to send spam or unsolicited bulk messages.</li>
+                <li>Accept that listings and profiles are visible to other signed-in members.</li>
+            </ul>
+
+            <p style="font-size: var(--fs-sm); color: var(--ink-2); margin-top: var(--s-5);">
+                The service is provided as-is, with no guarantee of uptime. Because it
+                is a portfolio project with a free-tier database, it may be reset or
+                taken down without notice.
+            </p>
+        </section>
+
+        <section class="profile-card" data-reveal>
+            <div class="profile-card-head"><h2>Contact</h2></div>
+
+            <p style="font-size: var(--fs-sm); color: var(--ink-2);">
+                This is an open-source project. Questions, corrections and bug reports
+                are welcome on the repository linked from the README.
+            </p>
+
+            <div class="edit-actions">
+                <a href="index.html" class="btn btn-ghost">Back to home</a>
+                <a href="auth/signup.html" class="btn btn-primary">Create an account</a>
+            </div>
+        </section>
+
+    </div>
+
+</main>
+
+<footer class="site-footer">
+    <div class="container footer-bottom">© 2026 LinkUp · <a href="legal.html">Privacy &amp; Terms</a></div>
+</footer>
+
+<script src="js/script.js"></script>
+</body>
+</html>

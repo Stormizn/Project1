@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "serve LinkUp",
+      "type": "process",
+      "command": "node",
+      "args": ["scripts/serve.mjs", "8080"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "silent", "panel": "dedicated" },
+      "problemMatcher": [
+        {
+          "owner": "linkup-serve",
+          "pattern": {
+            "regexp": "^$",
+            "file": 1,
+            "location": 0,
+            "message": 0
+          },
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": "^LinkUp dev server",
+            "endsPattern": "^press ctrl\\+c to stop$"
+          }
+        }
+      ],
+      "isBackground": true
+    }
+  ]
+}

@@ -492,6 +492,13 @@ p { text-wrap: pretty; }
 .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
 .status--pending { color: var(--ink-3); }
 .status--pending::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+/* A declined connection must not look like an accepted one. Without
+   these two rules .status--rejected falls back to the solid "accepted"
+   dot, because only --pending had an override. */
+.status--accepted { color: var(--ink); }
+.status--accepted::before { background: var(--ink); }
+.status--rejected { color: var(--danger); }
+.status--rejected::before { background: var(--danger); }
 
 .quick-actions { display: flex; flex-direction: column; }
 .quick-action {
@@ -502,6 +509,52 @@ p { text-wrap: pretty; }
 .quick-action strong { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
 .quick-action .arrow { grid-row: 1 / span 2; grid-column: 2; font-size: var(--fs-md); color: var(--ink); transition: transform var(--dur-2) var(--ease); }
 .quick-action:hover .arrow { transform: translateX(4px); }
+
+/* 12b. BLOCKS USED IN MARKUP BUT PREVIOUSLY UNSTYLED ------ */
+/* Every rule in here was referenced by a class in the HTML or built by
+   JS with no matching rule in this file, so the element rendered with
+   browser defaults. */
+
+/* Connections stacks `.profile-card` rows inside `.connection-list`.
+   Without this the cards sit flush against each other. */
+.connection-list { display: flex; flex-direction: column; gap: var(--s-4); }
+.connection-list:empty { display: none; }
+
+/* Empty states ("No connections yet", "Nothing to show for now"). */
+.empty-note {
+    display: flex; flex-direction: column; gap: var(--s-2);
+    padding: var(--s-6); border: 1px dashed var(--line-strong); border-radius: var(--r-md);
+    background: var(--surface); text-align: left;
+}
+.empty-note h3 { font-family: var(--font-display); font-size: var(--fs-md); letter-spacing: -0.01em; }
+.empty-note p { font-size: var(--fs-sm); color: var(--ink-2); max-width: 56ch; }
+
+/* `.welcome` is sized like a landing-page hero (64px/48px of vertical
+   padding). Connections reuses it as a compact panel via
+   `.dash-section.welcome-card`, which would otherwise leave a huge
+   gap under the topbar. */
+.welcome-card { min-width: 0; }
+.dash-section.welcome-card { padding-block: 0; gap: var(--s-5); }
+.dash-section.welcome-card > .section-header { margin-bottom: 0; }
+
+/* Marks a stamp whose number came from a live query. */
+.stamp--live { border-style: solid; border-color: var(--ink); color: var(--ink); }
+.stamp--live::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ink);
+}
+
+/* Discover's planner-only publishing panel: two forms side by side. */
+.create-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-5); align-items: start; }
+.create-form { gap: var(--s-3); }
+.create-form .form { margin-top: var(--s-2); }
+.create-form .profile-card-head { margin-bottom: 0; }
+
+/* The bell is decorative until notifications ship. Saying so keeps it
+   from reading as a broken control. */
+.notification { position: relative; }
+.notification[disabled] { opacity: .5; cursor: not-allowed; }
+.notification[disabled]:hover { border-color: var(--line); }
 
 /* 13. PROFILE --------------------------------------------- */
 .app-topbar { position: sticky; top: 0; z-index: 20; background: rgba(248, 228, 155, .92); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
@@ -533,6 +586,107 @@ p { text-wrap: pretty; }
 #editProfileCard .form { margin-top: var(--s-2); }
 .edit-actions { display: flex; flex-wrap: wrap; gap: var(--s-3); margin-top: var(--s-2); }
 
+/* 13b. MESSAGES ----------------------------------------- */
+/* Visually hidden but still announced. The composer's textarea needs a
+   real label, and "Write a message…" as a placeholder is not one. */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+.inbox-layout {
+    display: grid;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    gap: var(--s-5);
+    align-items: start;
+    padding-block: var(--s-6) var(--s-8);
+}
+.thread-list { display: flex; flex-direction: column; gap: var(--s-1); }
+.thread-list .section-header { margin-bottom: var(--s-2); }
+.thread {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: var(--s-3);
+    width: 100%;
+    padding: var(--s-3);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: transparent;
+    /* A <button> does not inherit font or colour from the page, so
+       without these two lines every thread row renders in the UA
+       default face while the rest of the app is Instrument Sans. */
+    font: inherit;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.thread:hover { background: rgba(1, 62, 55, .06); }
+.thread[aria-current="true"] { background: var(--surface); border-color: var(--line-strong); }
+.thread-avatar { width: 38px; height: 38px; font-size: var(--fs-xs); }
+.thread-body { min-width: 0; }
+.thread-name { font-size: var(--fs-sm); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-preview { font-size: var(--fs-xs); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); margin-top: 2px; }
+.thread-time { font-size: 0.75rem; color: var(--ink-3); white-space: nowrap; }
+.thread-unread {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: var(--r-pill);
+    background: var(--ink); color: var(--paper);
+    font-size: 0.6875rem; font-weight: 600;
+}
+
+.conversation { display: flex; flex-direction: column; min-height: 520px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
+.conversation-head { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--line); }
+.conversation-head .thread-name { font-size: var(--fs-md); }
+.conversation-log { display: flex; flex-direction: column; gap: var(--s-3); flex: 1; padding: var(--s-5); overflow-y: auto; max-height: 62vh; }
+.bubble-row { display: flex; }
+.bubble-row--mine { justify-content: flex-end; }
+.bubble {
+    max-width: min(72%, 46ch);
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--paper-2);
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+.bubble-row--mine .bubble { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.bubble-time { display: block; margin-top: 4px; font-size: 0.6875rem; color: var(--ink-3); }
+.bubble-row--mine .bubble-time { color: var(--inv-ink-2); text-align: right; }
+.conversation-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-3); flex: 1; padding: var(--s-8) var(--s-5); text-align: center; }
+.conversation-empty p { max-width: 44ch; font-size: var(--fs-sm); color: var(--ink-2); }
+
+.composer { display: flex; gap: var(--s-3); align-items: flex-end; padding: var(--s-4) var(--s-5); border-top: 1px solid var(--line); }
+.composer textarea {
+    flex: 1;
+    min-height: 48px;
+    max-height: 160px;
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-sm);
+    resize: vertical;
+}
+.composer textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+/* The send button is disabled until the field has real content, so
+   the disabled state has to read as "not ready" and not as "broken". */
+.composer .btn:disabled { opacity: .5; cursor: not-allowed; }
+.composer-hint { padding: 0 var(--s-5) var(--s-4); font-size: 0.75rem; color: var(--ink-3); }
+.composer .form-message { margin: 0 var(--s-5) var(--s-3); }
+
 /* 14. RESPONSIVE ------------------------------------------ */
 @media (max-width: 1100px) {
     .opportunity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -543,6 +697,14 @@ p { text-wrap: pretty; }
 }
 
 @media (max-width: 960px) {
+    /* One column: the thread list sits above the conversation and the
+       conversation scrolls into view when a thread is picked, so a
+       phone does not get a 240px list beside a 3-word message pane. */
+    .inbox-layout { grid-template-columns: minmax(0, 1fr); }
+    .conversation { min-height: 440px; }
+    .conversation-log { max-height: none; }
+    .bubble { max-width: 86%; }
+}
     .section, .cta { padding-block: var(--s-9); }
     .hero { padding-block: var(--s-7) var(--s-9); }
     .hero-grid, .split { grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
@@ -604,6 +766,7 @@ p { text-wrap: pretty; }
     .topbar-actions { width: 100%; }
     .search-box { flex: 1; width: auto; }
     .opportunity-grid { grid-template-columns: minmax(0, 1fr); }
+    .create-grid { grid-template-columns: minmax(0, 1fr); }
     .welcome { padding-block: var(--s-7) var(--s-6); }
 }
 

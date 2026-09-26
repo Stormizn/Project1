@@ -8,6 +8,7 @@
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
     <link rel="stylesheet" href="../css/style.css">
 </head>
@@ -31,7 +32,7 @@
             <div class="nav-title">Account</div>
             <nav class="dashboard-nav" aria-label="Account">
                 <a href="profile.html"><span class="nav-icon">07</span><span>Profile</span></a>
-                <a href="#" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
+                <a href="../auth/login.html" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
             </nav>
         </div>
 
@@ -51,51 +52,544 @@
         <header class="topbar">
             <div class="page-title">
                 <h1>Messages</h1>
-                <p>Your inbox, in one place.</p>
+                <p id="messagesDescription">Conversations with the brands and planners you're connected to.</p>
             </div>
         </header>
 
-        <section class="welcome welcome-card">
-            <p class="eyebrow eyebrow--rule" data-today data-reveal>Today</p>
-            <h2 data-reveal>Messages</h2>
-            <p data-reveal>Talk to brands and planners directly about partnerships.</p>
+        <!-- Shown instead of the inbox when the database has no
+             messages table yet, or when the read is rejected. -->
+        <section class="dash-section" id="fatalSection" hidden>
+            <div class="empty-note">
+                <h3 id="fatalTitle">Messages are not available yet</h3>
+                <p id="fatalBody"></p>
+                <div class="btn-row">
+                    <a class="btn btn-ghost" href="connections.html">Back to Connections</a>
+                </div>
+            </div>
         </section>
 
-        <section class="dashboard-panel" data-reveal>
-            <div class="section-header"><h2>Coming soon</h2></div>
-            <p>Messaging is planned for a later phase. When it ships, you'll be able to chat with your connections right here.</p>
-        </section>
+        <div class="inbox-layout" id="inboxLayout" hidden>
+
+            <section aria-label="Conversations">
+                <div class="thread-list">
+                    <div class="section-header">
+                        <h2>Threads</h2>
+                        <span class="section-header-meta" id="threadCount"></span>
+                    </div>
+                    <div id="threadList"></div>
+                </div>
+            </section>
+
+            <section class="conversation" aria-label="Conversation" aria-live="polite">
+
+                <div class="conversation-head" id="conversationHead" hidden>
+                    <div class="profile-avatar thread-avatar" id="conversationAvatar">·</div>
+                    <div>
+                        <div class="thread-name" id="conversationName">…</div>
+                        <div class="status status--accepted" id="conversationContext"></div>
+                    </div>
+                </div>
+
+                <div class="conversation-log" id="conversationLog"></div>
+
+                <form class="composer" id="composer" hidden>
+                    <label class="sr-only" for="messageInput" id="composerLabel">Message</label>
+                    <textarea id="messageInput" rows="1" placeholder="Write a message…"
+                              maxlength="2000" autocomplete="off"></textarea>
+                    <button class="btn btn-primary" type="submit" id="sendButton" disabled>
+                        Send <span class="arrow" aria-hidden="true">→</span>
+                    </button>
+                </form>
+                <p class="form-message" id="composerMessage" role="alert" hidden></p>
+                <p class="composer-hint" id="composerHint" hidden>Enter to send · Shift + Enter for a new line</p>
+
+            </section>
+
+        </div>
 
     </main>
 </div>
 
 <script src="../js/script.js"></script>
 
-<!-- POCKETBASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- SUPABASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
 <script src="../js/auth-guard.js"></script>
 
 <!-- MESSAGES LOGIC -->
 
 <script>
 
-    async function renderMessages() {
+    const db = window.supabaseClient;
+
+    let me = null;              // the signed-in profile row
+    let threads = [];           // accepted connections, newest activity not required
+    let activeId = null;        // connection_id of the open thread
+    let sending = false;
+
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
+    // Postgres/PostgREST error codes that mean "this table or column
+    // does not exist on the database", which is exactly what happens
+    // when supabase-migrations.sql has not been run yet. Showing the
+    // raw PostgREST string to a user is worse than useless, so it gets
+    // a sentence written for it.
+    function isMissingTable(err) {
+        if (!err) return false;
+        return err.code === "42P01"
+            || err.code === "PGRST205"
+            || err.code === "PGRST204"
+            || /does not exist/i.test(err.message || "");
+    }
+
+    function showFatal(title, body) {
+        document.getElementById("fatalTitle").textContent = title;
+        document.getElementById("fatalBody").textContent = body;
+        document.getElementById("fatalSection").hidden = false;
+        document.getElementById("inboxLayout").hidden = true;
+    }
+
+    // The other party on a connection. The embedded from_user / to_user
+    // objects can come back null if RLS hides that profile, so every
+    // caller has to cope with a missing object.
+    function otherParty(conn) {
+        if (!me) return null;
+        if (conn.from_user && conn.from_user.id === me.id) return conn.to_user;
+        return conn.from_user;
+    }
+
+    function partyName(party) {
+        if (!party) return "Unknown member";
+        var name = (party.name || "").trim();
+        return name || "LinkUp member";
+    }
+
+    // Today -> "4:32 pm", this year -> "5 Oct", older -> "Oct 2025".
+    // Older messages keep their full timestamp in the bubble itself.
+    function formatListTime(value) {
+        if (!value) return "";
+        var d = new Date(value);
+        if (isNaN(d.getTime())) return "";
+
+        var now = new Date();
+        var sameDay = d.getFullYear() === now.getFullYear()
+            && d.getMonth() === now.getMonth()
+            && d.getDate() === now.getDate();
+
+        if (sameDay) {
+            return d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+        }
+        if (d.getFullYear() === now.getFullYear()) {
+            return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+        }
+        return d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+    }
+
+    // ------------------------------------------------------------
+    // Thread list
+    // ------------------------------------------------------------
+
+    function renderThreadList() {
+        const list = document.getElementById("threadList");
+        list.textContent = "";
+
+        const totalUnread = threads.reduce(function (sum, t) {
+            return sum + (t.unreadCount || 0);
+        }, 0);
+
+        document.getElementById("threadCount").textContent =
+            plural(threads.length, "conversation") + (totalUnread ? " · " + totalUnread + " new" : "");
+
+        if (!threads.length) {
+            const note = document.createElement("div");
+            note.className = "empty-note";
+            const h = document.createElement("h3");
+            h.textContent = "No conversations yet";
+            const p = document.createElement("p");
+            p.textContent = "A thread opens once a planner accepts your interest in an opportunity. Accepted connections show up here.";
+            const a = document.createElement("a");
+            a.className = "btn btn-ghost btn-sm";
+            a.href = "connections.html";
+            a.textContent = "Go to Connections";
+            note.append(h, p, a);
+            list.appendChild(note);
+            return;
+        }
+
+        threads.forEach(function (thread) {
+            const party = otherParty(thread.conn);
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "thread";
+            button.setAttribute("aria-current", thread.conn.id === activeId ? "true" : "false");
+
+            const avatar = document.createElement("div");
+            avatar.className = "profile-avatar thread-avatar";
+            avatar.textContent = getInitials(partyName(party));
+
+            const body = document.createElement("div");
+            body.className = "thread-body";
+
+            const name = document.createElement("div");
+            name.className = "thread-name";
+            name.textContent = partyName(party);
+
+            const preview = document.createElement("div");
+            preview.className = "thread-preview";
+            var last = thread.lastMessage;
+            if (last) {
+                preview.textContent = (last.sender_id === me.id ? "You: " : "") + last.body;
+            } else {
+                preview.textContent = "No messages yet";
+            }
+
+            const meta = document.createElement("div");
+            meta.className = "thread-meta";
+
+            const time = document.createElement("span");
+            time.className = "thread-time";
+            time.textContent = last ? formatListTime(last.created_at) : "";
+
+            meta.appendChild(time);
+
+            if (thread.unreadCount) {
+                const badge = document.createElement("span");
+                badge.className = "thread-unread";
+                badge.textContent = String(thread.unreadCount);
+                meta.appendChild(badge);
+            }
+
+            body.append(name, preview, meta);
+            button.append(avatar, body);
+            button.addEventListener("click", function () {
+                openThread(thread.conn.id);
+            });
+
+            list.appendChild(button);
+        });
+    }
+
+    // ------------------------------------------------------------
+    // Conversation
+    // ------------------------------------------------------------
+
+    function renderConversation() {
+        const log = document.getElementById("conversationLog");
+        const composer = document.getElementById("composer");
+        const hint = document.getElementById("composerHint");
+        const head = document.getElementById("conversationHead");
+
+        log.textContent = "";
+
+        if (!activeId) {
+            head.hidden = true;
+            composer.hidden = true;
+            hint.hidden = true;
+
+            const empty = document.createElement("div");
+            empty.className = "conversation-empty";
+            const h = document.createElement("h3");
+            h.textContent = "Pick a conversation";
+            const p = document.createElement("p");
+            p.textContent = "Choose someone on the left to read and reply to your messages.";
+            empty.append(h, p);
+            log.appendChild(empty);
+            return;
+        }
+
+        const thread = threads.find(function (t) {
+            return t.conn.id === activeId;
+        });
+
+        if (!thread) {
+            head.hidden = true;
+            composer.hidden = true;
+            hint.hidden = true;
+            return;
+        }
+
+        const conn = thread.conn;
+        const party = otherParty(conn);
+
+        head.hidden = false;
+        document.getElementById("conversationAvatar").textContent = getInitials(partyName(party));
+        document.getElementById("conversationName").textContent = partyName(party);
+        document.getElementById("conversationContext").textContent = conn.opportunity_id && conn.opportunity_id.title
+            ? "About: " + conn.opportunity_id.title
+            : "Direct message";
+
+        composer.hidden = false;
+        hint.hidden = false;
+        document.getElementById("composerLabel").textContent = "Message " + partyName(party);
+
+        if (!thread.messages.length) {
+            const empty = document.createElement("div");
+            empty.className = "conversation-empty";
+            const h = document.createElement("h3");
+            h.textContent = "No messages yet";
+            const p = document.createElement("p");
+            p.textContent = "This connection is accepted, so you can start the conversation.";
+            empty.append(h, p);
+            log.appendChild(empty);
+            return;
+        }
+
+        thread.messages.forEach(function (message) {
+            const mine = message.sender_id === me.id;
+
+            const row = document.createElement("div");
+            row.className = "bubble-row" + (mine ? " bubble-row--mine" : "");
+
+            const bubble = document.createElement("div");
+            bubble.className = "bubble";
+            // textContent, never innerHTML: this is user input from
+            // another account, so it must never be parsed as markup.
+            bubble.textContent = message.body;
+
+            const time = document.createElement("span");
+            time.className = "bubble-time";
+            time.textContent = formatDateTime(message.created_at, "");
+            bubble.appendChild(time);
+
+            row.appendChild(bubble);
+            log.appendChild(row);
+        });
+
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function syncSendButton() {
+        const input = document.getElementById("messageInput");
+        const button = document.getElementById("sendButton");
+        button.disabled = sending || !input.value.trim();
+    }
+
+    // ------------------------------------------------------------
+    // Data
+    // ------------------------------------------------------------
+
+    async function loadThreads() {
+        const { data, error } = await db
+            .from("connections")
+            .select("*, from_user(*), to_user(*), opportunity_id(*)")
+            .or(`from_user.eq.${me.id},to_user.eq.${me.id}`)
+            .eq("status", "accepted")
+            .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        const list = data || [];
+        if (!list.length) {
+            threads = [];
+            return;
+        }
+
+        // One query for every thread's messages rather than N queries:
+        // the `.in()` keeps this a single round trip, and it is the
+        // difference between 1 request and one-per-conversation on a
+        // busy account.
+        const ids = list.map(function (c) { return c.id; });
+
+        const { data: allMessages, error: msgError } = await db
+            .from("messages")
+            .select("id, connection_id, sender_id, body, created_at, read_at")
+            .in("connection_id", ids)
+            .order("created_at", { ascending: true });
+
+        if (msgError) throw msgError;
+
+        threads = list.map(function (conn) {
+            const own = (allMessages || []).filter(function (m) {
+                return m.connection_id === conn.id;
+            });
+
+            return {
+                conn: conn,
+                messages: own,
+                lastMessage: own.length ? own[own.length - 1] : null,
+                unreadCount: own.filter(function (m) {
+                    return m.read_at === null && m.sender_id !== me.id;
+                }).length
+            };
+        });
+    }
+
+    async function markThreadRead(thread) {
+        const unread = thread.messages.filter(function (m) {
+            return m.read_at === null && m.sender_id !== me.id;
+        });
+        if (!unread.length) return;
+
+        const now = new Date().toISOString();
+        const ids = unread.map(function (m) { return m.id; });
+
+        const { error } = await db
+            .from("messages")
+            .update({ read_at: now })
+            .in("id", ids);
+
+        if (error) {
+            // Not worth interrupting the user for: the message is
+            // already on screen, only the badge is stale.
+            console.warn("Could not mark messages read:", error);
+            return;
+        }
+
+        unread.forEach(function (m) { m.read_at = now; });
+        thread.unreadCount = 0;
+    }
+
+    async function openThread(connectionId) {
+        activeId = connectionId;
+        renderThreadList();
+        renderConversation();
+
+        // Keep the thread in the address bar so a refresh (or a shared
+        // link) reopens the same conversation.
+        const url = new URL(window.location.href);
+        url.searchParams.set("connection", connectionId);
+        window.history.replaceState({}, "", url);
+
+        const thread = threads.find(function (t) { return t.conn.id === connectionId; });
+        if (!thread) return;
+
+        await markThreadRead(thread);
+        renderThreadList();
+        renderConversation();
+
+        document.getElementById("messageInput").focus();
+
+        // On a phone the list is stacked above the conversation, so
+        // selecting a thread has to actually move the viewport.
+        if (window.matchMedia("(max-width: 960px)").matches) {
+            document.getElementById("conversationHead")
+                .scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    }
+
+    async function sendMessage(event) {
+        event.preventDefault();
+        if (sending || !activeId) return;
+
+        const input = document.getElementById("messageInput");
+        const body = input.value.trim();
+        if (!body) return;
+
+        sending = true;
+        syncSendButton();
+        hideFormMessage(document.getElementById("composerMessage"));
+
+        const { data, error } = await db
+            .from("messages")
+            .insert({
+                connection_id: activeId,
+                sender_id: me.id,
+                body: body
+            })
+            .select("id, connection_id, sender_id, body, created_at, read_at")
+            .single();
+
+        sending = false;
+
+        if (error) {
+            setFormMessage(
+                document.getElementById("composerMessage"),
+                "Could not send: " + getErrorMessage(error),
+                true
+            );
+            syncSendButton();
+            return;
+        }
+
+        input.value = "";
+        input.style.height = "auto";
+
+        const thread = threads.find(function (t) { return t.conn.id === activeId; });
+        if (thread) {
+            thread.messages.push(data);
+            thread.lastMessage = data;
+            // A message you just sent is read by definition.
+            renderThreadList();
+            renderConversation();
+        }
+
+        syncSendButton();
+        input.focus();
+    }
+
+    // ------------------------------------------------------------
+    // Boot
+    // ------------------------------------------------------------
+
+    async function renderInbox() {
         const auth = await requireSession();
         if (auth === null) return;
 
         const profile = auth.profile;
-        const fullName = profile.name ? profile.name.trim() : "";
-        const displayName = getDisplayName(auth);
+        if (!profile) {
+            showFatal(
+                "Your profile could not be loaded",
+                "Check your connection and reload the page."
+            );
+            return;
+        }
 
-        document.getElementById("sidebarAvatar").textContent =
-            getInitials(fullName || "LinkUp User");
-        document.getElementById("sidebarName").textContent =
-            displayName;
+        me = profile;
+
+        const fullName = profile.name ? profile.name.trim() : "";
+        document.getElementById("sidebarAvatar").textContent = getInitials(fullName || "LinkUp User");
+        document.getElementById("sidebarName").textContent = getDisplayName(auth);
         document.getElementById("sidebarRoleLabel").textContent =
-            profile.role === "event_planner"
-                ? "Event Planner Account"
-                : "Brand Account";
+            profile.role === "event_planner" ? "Event Planner Account" : "Brand Account";
+
+        try {
+            await loadThreads();
+        } catch (err) {
+            if (isMissingTable(err)) {
+                showFatal(
+                    "Messages are not set up on this database yet",
+                    "The messages table is created by supabase-migrations.sql. Run that file in the Supabase SQL Editor, then reload this page."
+                );
+                return;
+            }
+            showFatal(
+                "Messages could not be loaded",
+                getErrorMessage(err)
+            );
+            return;
+        }
+
+        document.getElementById("fatalSection").hidden = true;
+        document.getElementById("inboxLayout").hidden = false;
+
+        // A ?connection= link only opens a thread that is actually in
+        // this user's list, so a hand-edited URL cannot reach a
+        // conversation that is not theirs.
+        const requested = new URL(window.location.href).searchParams.get("connection");
+        const target = threads.find(function (t) { return t.conn.id === requested; });
+
+        if (target) {
+            await openThread(target.conn.id);
+        } else {
+            const newest = threads.slice().sort(function (a, b) {
+                var at = a.lastMessage ? new Date(a.lastMessage.created_at).getTime() : 0;
+                var bt = b.lastMessage ? new Date(b.lastMessage.created_at).getTime() : 0;
+                return bt - at;
+            })[0];
+
+            if (newest) {
+                await openThread(newest.conn.id);
+            } else {
+                activeId = null;
+                renderThreadList();
+                renderConversation();
+            }
+        }
     }
 
     document.getElementById("signOutLink")
@@ -104,7 +598,30 @@
             signOut();
         });
 
-    renderMessages().catch(function (error) {
+    document.getElementById("composer")
+        .addEventListener("submit", sendMessage);
+
+    document.getElementById("messageInput")
+        .addEventListener("input", function () {
+            // Grow with the content up to the CSS max-height, then
+            // scroll instead of resizing forever.
+            this.style.height = "auto";
+            this.style.height = Math.min(this.scrollHeight, 160) + "px";
+            syncSendButton();
+        });
+
+    document.getElementById("messageInput")
+        .addEventListener("keydown", function (event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                document.getElementById("composer")
+                    .requestSubmit();
+            }
+        });
+
+    watchSessionExpiry();
+
+    renderInbox().catch(function (error) {
         console.error("Messages failed to load:", error);
     });
 

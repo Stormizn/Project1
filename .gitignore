@@ -36,11 +36,11 @@ $RECYCLE.BIN/
 # ------------------------------------------
 # Editor / IDE
 # ------------------------------------------
-# .vscode/launch.json is tracked on purpose
-# (it is the shared "Launch Chrome" config),
-# so only personal VS Code settings are ignored.
+# .vscode/launch.json and .vscode/tasks.json are both tracked on
+# purpose: they are the shared "serve + open LinkUp" debug config,
+# and launch.json cannot work without the task it references.
+# Only personal VS Code settings stay ignored.
 .vscode/settings.json
-.vscode/tasks.json
 .idea/
 *.swp
 
@@ -77,6 +77,7 @@ build/
 # Internal working notes (AI session logs /
 # scratch) — kept OUT of the public repo.
 # ------------------------------------------
+todos.md
 txt/
 *.txt
 md/CHAT_HISTORY.md
@@ -86,5 +87,6 @@ md/CURRENT_STATUS.md
 md/IMPLEMENTATION_PLAN.md
 md/REDESIGN_PROMPT.md
 md/ROADMAP.md
+ROADMAP.md
 
 # NOTE: md/README.md stays TRACKED so it ships.

@@ -8,6 +8,7 @@
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
     <link rel="stylesheet" href="../css/style.css">
 </head>
@@ -31,7 +32,7 @@
             <div class="nav-title">Account</div>
             <nav class="dashboard-nav" aria-label="Account">
                 <a href="profile.html"><span class="nav-icon">07</span><span>Profile</span></a>
-                <a href="#" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
+                <a href="../auth/login.html" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
             </nav>
         </div>
 
@@ -55,11 +56,11 @@
             </div>
             <div class="topbar-actions">
                 <label class="search-box">
-                    <span class="visually-hidden">Search opportunities</span>
+                    <span class="visually-hidden">Search recommended opportunities</span>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.25" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                    <input type="text" placeholder="Search opportunities…">
+                    <input type="text" id="dashboardSearch" placeholder="Search opportunities…">
                 </label>
-                <button class="icon-btn notification" type="button" aria-label="Notifications">
+                <button class="icon-btn notification" type="button" aria-label="Notifications (not available yet)" title="Notifications are not available yet" disabled>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6.5a4 4 0 118 0v3l1.25 2H2.75L4 9.5v-3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.4"/></svg>
                 </button>
             </div>
@@ -76,7 +77,7 @@
             <div class="section-header">
                 <h2>Recommended opportunities</h2>
                 <div class="section-header-meta">
-                    <span class="stamp stamp--live">Live</span>
+                    <span class="stamp stamp--live" id="recommendedStamp">Live</span>
                     <a href="opportunities.html" class="text-link">View all <span aria-hidden="true">→</span></a>
                 </div>
             </div>
@@ -88,28 +89,12 @@
             <section class="dashboard-panel" data-reveal>
                 <div class="section-header">
                     <h2>Recent connections</h2>
-                    <span class="stamp">Sample</span>
+                    <span class="stamp" id="connectionsStamp">Loading…</span>
                 </div>
-                <div class="connection-row">
-                    <div class="connection-person">
-                        <div class="connection-avatar">CF</div>
-                        <div><strong>College Fest 2026</strong><span>Event planner</span></div>
-                    </div>
-                    <span class="status">Connected</span>
-                </div>
-                <div class="connection-row">
-                    <div class="connection-person">
-                        <div class="connection-avatar">SM</div>
-                        <div><strong>Startup Meetup</strong><span>Event planner</span></div>
-                    </div>
-                    <span class="status status--pending">Pending</span>
-                </div>
-                <div class="connection-row">
-                    <div class="connection-person">
-                        <div class="connection-avatar">LE</div>
-                        <div><strong>Lifestyle Expo</strong><span>Event planner</span></div>
-                    </div>
-                    <span class="status">Connected</span>
+                <div id="connectionList"></div>
+                <div class="empty-note" id="connectionsEmpty" style="display: none;">
+                    <p>No connections yet. Open an opportunity and mark
+                       "I'm Interested" to start one.</p>
                 </div>
             </section>
 
@@ -132,8 +117,9 @@
 <script src="../js/script.js"></script>
 
 <!-- SUPABASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
 <script src="../js/auth-guard.js"></script>
 
 <!-- DASHBOARD LOGIC -->
@@ -145,16 +131,20 @@
 
         if (auth === null) return; // not logged in
 
-        const user = auth.user;
-        const profile = auth.profile;
+        // 2. The session is fine but the profile could not be read.
+        //    Do NOT sign out — that used to bounce people back to login.
 
-        // 2. Show a friendly note if the profile row is missing
-
-        if (!profile) {
+        if (!auth.profile) {
+            console.error("Dashboard: profile unavailable", auth.error);
             document.getElementById("welcomeDescription").textContent =
-                "Your profile could not be loaded. Please try signing in again.";
+                "Your profile could not be loaded. Check your connection and reload this page.";
+            document.getElementById("recommendedStamp").textContent = "Unavailable";
+            document.getElementById("connectionsStamp").textContent = "Unavailable";
             return;
         }
+
+        const user = auth.user;
+        const profile = auth.profile;
 
         const fullName = profile.name ? profile.name.trim() : "";
         const displayName = getDisplayName(auth, "there");
@@ -213,13 +203,189 @@
         }
 
         await renderRecommended();
+        await renderRecentConnections(profile);
     }
 
-    async function renderRecommended() {
-        // 3 most recent opportunities, linked to their event + organizer.
+    // The 4 most recent connections involving this user, whichever
+    // side of the connection they are on.
+    var recentConnectionRows = [];
+
+    async function renderRecentConnections(profile) {
+        var list = document.getElementById("connectionList");
+        var empty = document.getElementById("connectionsEmpty");
+        var stamp = document.getElementById("connectionsStamp");
+
+        try {
+            const { data: rows, error } = await window.supabaseClient
+                .from("connections")
+                .select("*, from_user(*), to_user(*), opportunity_id(*)")
+                .or(`from_user.eq.${profile.id},to_user.eq.${profile.id}`)
+                .order("created_at", { ascending: false })
+                .limit(4);
+
+            if (error) throw error;
+
+            recentConnectionRows = rows || [];
+
+            if (!recentConnectionRows.length) {
+                list.innerHTML = "";
+                empty.style.display = "block";
+                if (stamp) stamp.textContent = "0";
+                return;
+            }
+
+            empty.style.display = "none";
+            if (stamp) stamp.textContent = plural(recentConnectionRows.length, "recent");
+
+            list.innerHTML = "";
+
+            recentConnectionRows.forEach(function (conn) {
+                // Show the OTHER party, not the signed-in user.
+                var other = conn.from_user && conn.from_user.id === profile.id
+                    ? conn.to_user
+                    : conn.from_user;
+                var otherName = (other && other.name ? other.name.trim() : "") || "LinkUp member";
+                var opp = conn.opportunity_id || null;
+                var oppTitle = opp && opp.title ? opp.title : "Partnership request";
+
+                var row = document.createElement("div");
+                row.className = "connection-row";
+
+                var person = document.createElement("div");
+                person.className = "connection-person";
+
+                var avatar = document.createElement("div");
+                avatar.className = "connection-avatar";
+                avatar.textContent = getInitials(otherName);
+
+                var text = document.createElement("div");
+                var strong = document.createElement("strong");
+                strong.textContent = otherName;
+                var role = document.createElement("span");
+                role.textContent = oppTitle;
+                text.appendChild(strong);
+                text.appendChild(role);
+
+                person.appendChild(avatar);
+                person.appendChild(text);
+
+                var status = document.createElement("span");
+                status.className = "status" + (
+                    conn.status === "accepted" ? " status--accepted" :
+                    conn.status === "rejected" ? " status--rejected" :
+                    conn.status === "pending" ? " status--pending" : ""
+                );
+                status.textContent =
+                    conn.status === "accepted" ? "Connected" :
+                    conn.status === "rejected" ? "Declined" :
+                    conn.status === "archived" ? "Archived" : "Pending";
+
+                row.appendChild(person);
+                row.appendChild(status);
+                list.appendChild(row);
+            });
+        } catch (err) {
+            console.error("Could not load connections:", err);
+            list.innerHTML = "";
+            if (stamp) stamp.textContent = "—";
+        }
+    }
+
+    var recommendedRows = [];
+
+    // Draw the recommendation cards for whatever subset is passed in.
+    // Split out of renderRecommended() so the topbar search box can
+    // re-filter without another network round trip.
+    function drawRecommendedCards(rows) {
         var grid = document.getElementById("recommendedGrid");
         var empty = document.getElementById("recommendedEmpty");
         var stamp = document.getElementById("recommendedStamp");
+
+        grid.innerHTML = "";
+
+        if (!rows.length) {
+            grid.style.display = "none";
+            empty.style.display = "";
+            if (stamp) stamp.textContent = "0 matches";
+            return;
+        }
+
+        grid.style.display = "";
+        empty.style.display = "none";
+        if (stamp) {
+            stamp.textContent = rows.length === 1 ? "1 latest" : rows.length + " latest";
+            stamp.className = "stamp stamp--live";
+        }
+
+        // `event_id(*)` and `organizer_id(*)` already arrive as embedded
+        // objects, so the card code can read item.event_id.name directly.
+        rows.forEach(function (item) {
+            var eventName =
+                item.event_id && item.event_id.name
+                    ? item.event_id.name
+                    : "Event TBA";
+            var type = item.type || "Partnership";
+            var title = item.title || "Untitled opportunity";
+            var desc = item.description || "No description provided yet.";
+            var budget = item.budget ? "Budget: $" + item.budget : "Budget TBA";
+            var audience = item.audience || "Audience TBA";
+
+            var card = document.createElement("article");
+            card.className = "opportunity-card tilt";
+            card.setAttribute("data-tilt", "4");
+            card.setAttribute("data-reveal", "");
+
+            var pill = document.createElement("span");
+            pill.className = "opportunity-type";
+            pill.textContent = type;
+
+            var h3 = document.createElement("h3");
+            var link = document.createElement("a");
+            link.href = "opportunity.html?id=" + encodeURIComponent(item.id);
+            link.textContent = title;
+            h3.appendChild(link);
+
+            var p = document.createElement("p");
+            p.textContent = desc;
+
+            var details = document.createElement("div");
+            details.className = "opportunity-details";
+            var doEvent = document.createElement("span");
+            doEvent.textContent = eventName;
+            var doBudget = document.createElement("span");
+            doBudget.textContent = budget;
+            var doAudience = document.createElement("span");
+            doAudience.textContent = audience;
+            details.appendChild(doEvent);
+            details.appendChild(doBudget);
+            details.appendChild(doAudience);
+
+            var view = document.createElement("div");
+            view.className = "match";
+            var viewLabel = document.createElement("a");
+            viewLabel.className = "text-link";
+            viewLabel.href = "opportunity.html?id=" + encodeURIComponent(item.id);
+            viewLabel.textContent = "View opportunity";
+            var viewArrow = document.createElement("span");
+            viewArrow.textContent = "→";
+            view.appendChild(viewLabel);
+            view.appendChild(viewArrow);
+
+            card.appendChild(pill);
+            card.appendChild(h3);
+            card.appendChild(p);
+            card.appendChild(details);
+            card.appendChild(view);
+            grid.appendChild(card);
+        });
+
+        // These cards were just inserted, so they need the scroll-reveal
+        // and tilt hooks that were only wired up at page load.
+        if (window.linkupUI) window.linkupUI.enhance(grid);
+    }
+
+    async function renderRecommended() {
+        var empty = document.getElementById("recommendedEmpty");
 
         try {
             const { data: rows, error } = await window.supabaseClient
@@ -230,100 +396,49 @@
 
             if (error) throw error;
 
-            if (stamp) {
-                stamp.textContent = "Live";
-                stamp.className = "stamp stamp--live";
-            }
+            recommendedRows = rows || [];
+            drawRecommendedCards(recommendedRows);
+        } catch (err) {
+            console.error("Could not load recommended opportunities:", err);
+            recommendedRows = [];
+            document.getElementById("recommendedGrid").style.display = "none";
+            empty.style.display = "";
+            empty.textContent = "Opportunities could not be loaded. Please try again.";
+        }
+    }
 
-            if (!rows || !rows.length) {
-                grid.style.display = "none";
-                empty.style.display = "";
+    // The topbar search box used to be decorative. Wire it to the
+    // recommendations that are already on the page.
+    document.getElementById("dashboardSearch")
+        .addEventListener("input", function (event) {
+            var query = event.target.value.trim().toLowerCase();
+
+            if (!query) {
+                drawRecommendedCards(recommendedRows);
                 return;
             }
 
-            // Map expand objects for compatibility with render logic
-            const mappedRows = rows.map(r => ({
-                ...r,
-                expand: {
-                    event_id: r.event_id,
-                    organizer_id: r.organizer_id
-                }
+            drawRecommendedCards(recommendedRows.filter(function (item) {
+                var haystack = [
+                    item.title,
+                    item.type,
+                    item.budget,
+                    item.audience,
+                    item.description,
+                    item.event_id && item.event_id.name,
+                    item.organizer_id && item.organizer_id.name
+                ].join(" ").toLowerCase();
+                return haystack.indexOf(query) !== -1;
             }));
-
-            grid.innerHTML = "";
-            mappedRows.forEach(function (item) {
-                var eventName =
-                    item.event_id && item.event_id.name
-                        ? item.event_id.name
-                        : "Event TBA";
-                var type = item.type || "Partnership";
-                var title = item.title || "Untitled opportunity";
-                var desc = item.description || "No description provided yet.";
-                var budget = item.budget
-                    ? "Budget: $" + item.budget
-                    : "Budget TBA";
-                var audience = item.audience || "Audience TBA";
-
-                var card = document.createElement("article");
-                card.className = "opportunity-card tilt";
-                card.setAttribute("data-tilt", "4");
-                card.setAttribute("data-reveal", "");
-
-                var pill = document.createElement("span");
-                pill.className = "opportunity-type";
-                pill.textContent = type;
-
-                var h3 = document.createElement("h3");
-                var link = document.createElement("a");
-                link.href = "opportunity.html?id=" + encodeURIComponent(item.id);
-                link.textContent = title;
-                h3.appendChild(link);
-
-                var p = document.createElement("p");
-                p.textContent = desc;
-
-                var details = document.createElement("div");
-                details.className = "opportunity-details";
-                var doEvent = document.createElement("span");
-                doEvent.textContent = eventName;
-                var doBudget = document.createElement("span");
-                doBudget.textContent = budget;
-                var doAudience = document.createElement("span");
-                doAudience.textContent = audience;
-                details.appendChild(doEvent);
-                details.appendChild(doBudget);
-                details.appendChild(doAudience);
-
-                var view = document.createElement("div");
-                view.className = "match";
-                var viewLabel = document.createElement("span");
-                viewLabel.textContent = "View opportunity";
-                var viewArrow = document.createElement("span");
-                viewArrow.textContent = "→";
-                view.appendChild(viewLabel);
-                view.appendChild(viewArrow);
-
-                card.appendChild(pill);
-                card.appendChild(h3);
-                card.appendChild(p);
-                card.appendChild(details);
-                card.appendChild(view);
-                grid.appendChild(card);
-            });
-        } catch (err) {
-            console.error("Could not load recommended opportunities:", err);
-            grid.style.display = "none";
-            empty.style.display = "";
-            empty.textContent =
-                "Opportunities could not be loaded. Please try again.";
-        }
-    }
+        });
 
     document.getElementById("signOutLink")
         .addEventListener("click", function (event) {
             event.preventDefault();
             signOut();
         });
+
+    watchSessionExpiry();
 
     renderDashboard().catch(function(error) {
         console.error("Dashboard failed to load:", error);

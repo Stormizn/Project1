@@ -8,6 +8,7 @@
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
     <link rel="stylesheet" href="../css/style.css">
 </head>
@@ -31,7 +32,7 @@
             <div class="nav-title">Account</div>
             <nav class="dashboard-nav" aria-label="Account">
                 <a href="profile.html"><span class="nav-icon">07</span><span>Profile</span></a>
-                <a href="#" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
+                <a href="../auth/login.html" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
             </nav>
         </div>
 
@@ -59,7 +60,7 @@
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.25" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                     <input type="text" id="searchInput" placeholder="Search opportunities…">
                 </label>
-                <button class="icon-btn notification" type="button" aria-label="Notifications">
+                <button class="icon-btn notification" type="button" aria-label="Notifications (not available yet)" title="Notifications are not available yet" disabled>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6.5a4 4 0 118 0v3l1.25 2H2.75L4 9.5v-3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.4"/></svg>
                 </button>
             </div>
@@ -92,9 +93,10 @@
 
 <script src="../js/script.js"></script>
 
-<!-- POCKETBASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- SUPABASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
 <script src="../js/auth-guard.js"></script>
 
 <!-- OPPORTUNITIES LOGIC -->
@@ -136,8 +138,17 @@
             pill.className = "opportunity-type";
             pill.textContent = item.type || "Partnership";
 
+            // The whole card is the link target. Previously the only
+            // affordance was a non-interactive <div> at the bottom, so
+            // "Apply" led nowhere and opportunity.html was unreachable
+            // from this page.
+            var detailUrl = "opportunity.html?id=" + encodeURIComponent(item.id);
+
             var h3 = document.createElement("h3");
-            h3.textContent = item.title || "Untitled opportunity";
+            var titleLink = document.createElement("a");
+            titleLink.href = detailUrl;
+            titleLink.textContent = item.title || "Untitled opportunity";
+            h3.appendChild(titleLink);
 
             var desc = document.createElement("p");
             desc.textContent = item.description || "No description provided yet.";
@@ -163,20 +174,31 @@
             card.appendChild(desc);
             card.appendChild(details);
 
-            if (organizer) {
-                var match = document.createElement("div");
-                match.className = "match";
-                var label = document.createElement("span");
-                label.textContent = item.status === "open" ? "Open · " + organizer : "Closed · " + organizer;
-                var value = document.createElement("span");
-                value.textContent = item.status === "open" ? "Apply" : "Closed";
-                match.appendChild(label);
-                match.appendChild(value);
-                card.appendChild(match);
-            }
+            var isOpen = item.status === "open";
+
+            var match = document.createElement("div");
+            match.className = "match";
+
+            var label = document.createElement("span");
+            label.textContent = organizer
+                ? (isOpen ? "Open · " + organizer : "Closed · " + organizer)
+                : (isOpen ? "Open" : "Closed");
+
+            var value = document.createElement("span");
+            var valueLink = document.createElement("a");
+            valueLink.className = "text-link";
+            valueLink.href = detailUrl;
+            valueLink.textContent = isOpen ? "View & apply" : "View";
+            value.appendChild(valueLink);
+
+            match.appendChild(label);
+            match.appendChild(value);
+            card.appendChild(match);
 
             grid.appendChild(card);
         });
+
+        if (window.linkupUI) window.linkupUI.enhance(grid);
     }
 
     function applyFilter() {
@@ -206,6 +228,13 @@
         if (auth === null) return;
 
         const profile = auth.profile;
+
+        if (!profile) {
+            console.error("Opportunities: profile unavailable", auth.error);
+            document.getElementById("opportunityCount").textContent = "Profile unavailable";
+            return;
+        }
+
         const isEventPlanner = profile.role === "event_planner";
         const fullName = profile.name ? profile.name.trim() : "";
         const displayName = getDisplayName(auth);
@@ -239,16 +268,10 @@
             const { data, error } = await query;
             if (error) throw error;
 
-            // Map expand objects for compatibility with render logic
-            allOpportunities = (data || []).map(o => ({
-                ...o,
-                expand: {
-                    event_id: o.event_id,
-                    organizer_id: o.organizer_id
-                },
-                event_id: o.event_id,
-                organizer_id: o.organizer_id
-            }));
+            // `event_id(*)` and `organizer_id(*)` already arrive as
+            // embedded objects, so the card code can read
+            // item.event_id.name directly.
+            allOpportunities = data || [];
         } catch (err) {
             console.error("Could not load opportunities:", err);
             document.getElementById("opportunityCount").textContent =
@@ -267,6 +290,8 @@
             event.preventDefault();
             signOut();
         });
+
+    watchSessionExpiry();
 
     renderOpportunitiesPage().catch(function (error) {
         console.error("Opportunities failed to load:", error);

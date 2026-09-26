@@ -8,6 +8,7 @@
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
     <link rel="stylesheet" href="../css/style.css">
 </head>
@@ -60,7 +61,7 @@
                     </div>
 
                     <div class="login-options">
-                        <a href="#" class="forgot-password">Forgot password?</a>
+                        <a href="forgot-password.html" class="forgot-password">Forgot password?</a>
                     </div>
 
                     <button type="submit" class="btn btn-primary btn-block login-submit">Sign In →</button>
@@ -78,7 +79,7 @@
 <script src="../js/script.js"></script>
 
     <!-- SUPABASE SDK (must load before the shared config) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
     <!-- SHARED SUPABASE CONFIG -->
     <script src="../js/supabase.js"></script>
@@ -95,10 +96,15 @@
             loginMessage.style.display = "block";
         }
 
-        // If the user just created an account, show a friendly note.
+        // If the user just created an account, point them at the
+        // confirmation step when email confirmation is switched on.
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("created")) {
-            showLoginMessage("Account created — welcome! Sign in to continue.", false);
+            showLoginMessage(
+                "Account created. If you received a confirmation email, " +
+                "click that link first — then sign in here.",
+                false
+            );
         }
 
         // REAL SUPABASE LOGIN
