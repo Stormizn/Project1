@@ -51,8 +51,8 @@
 
         <header class="topbar">
             <div class="page-title">
-                <h1>Proposals</h1>
-                <p id="proposalsDescription">What each side is putting on the table.</p>
+                <h1 data-reveal>Proposals</h1>
+                <p id="proposalsDescription" data-reveal>What each side is putting on the table.</p>
             </div>
         </header>
 
@@ -60,15 +60,15 @@
              table yet, or when the read is rejected. -->
         <section class="dash-section" id="fatalSection" hidden>
             <div class="empty-note">
-                <h3 id="fatalTitle">Proposals are not available yet</h3>
-                <p id="fatalBody"></p>
+                <h3 id="fatalTitle" data-reveal>Proposals are not available yet</h3>
+                <p id="fatalBody" data-reveal></p>
                 <div class="btn-row">
                     <a class="btn btn-ghost" href="connections.html">Back to Connections</a>
                 </div>
             </div>
         </section>
 
-        <section class="dash-section welcome-card" id="listSection" hidden>
+        <section class="dash-section welcome-card" id="listSection" hidden data-reveal>
 
             <div class="section-header">
                 <h2 id="listHeading">Your proposals</h2>
@@ -88,8 +88,8 @@
             <div class="connection-list" id="proposalList" style="margin-top: var(--s-5);"></div>
 
             <div class="empty-note" id="proposalEmpty" hidden>
-                <h3 id="emptyTitle">No proposals yet</h3>
-                <p id="emptyBody"></p>
+                <h3 id="emptyTitle" data-reveal>No proposals yet</h3>
+                <p id="emptyBody" data-reveal></p>
                 <div class="btn-row" id="emptyActions"></div>
             </div>
 

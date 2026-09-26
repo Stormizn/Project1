@@ -51,8 +51,8 @@
 
         <header class="topbar">
             <div class="page-title">
-                <h1 id="pageTitle">Proposal</h1>
-                <p id="pageSubtitle">The offer, and where it stands.</p>
+                <h1 id="pageTitle" data-reveal>Proposal</h1>
+                <p id="pageSubtitle" data-reveal>The offer, and where it stands.</p>
             </div>
             <a href="proposals.html" class="back-link" style="margin-bottom: 0;">&larr; All proposals</a>
         </header>
@@ -63,8 +63,8 @@
                  proposals table, or the row cannot be read. -->
             <section class="dash-section" id="fatalSection" hidden>
                 <div class="empty-note">
-                    <h3 id="fatalTitle">Proposal unavailable</h3>
-                    <p id="fatalBody"></p>
+                <h3 id="fatalTitle" data-reveal>Proposal unavailable</h3>
+                <p id="fatalBody" data-reveal></p>
                     <div class="btn-row">
                         <a class="btn btn-ghost" href="proposals.html">Back to Proposals</a>
                     </div>
@@ -72,7 +72,7 @@
             </section>
 
             <!-- ---------- the offer itself ---------- -->
-            <section class="profile-card" id="termsCard" hidden>
+            <section class="profile-card" id="termsCard" hidden data-reveal>
                 <div class="profile-card-head">
                     <h2 id="termsHeading">What's on the table</h2>
                     <span class="status" id="proposalStatus">&hellip;</span>
@@ -113,7 +113,7 @@
             </section>
 
             <!-- ---------- the planner's note ---------- -->
-            <section class="profile-card" id="noteCard" hidden>
+            <section class="profile-card" id="noteCard" hidden data-reveal>
                 <div class="profile-card-head">
                     <h2>From the planner</h2>
                 </div>
@@ -121,7 +121,7 @@
             </section>
 
             <!-- ---------- brand: the editable offer ---------- -->
-            <section class="profile-card" id="editCard" hidden>
+            <section class="profile-card" id="editCard" hidden data-reveal>
                 <div class="profile-card-head">
                     <h2 id="editHeading">Your offer</h2>
                 </div>
@@ -188,7 +188,7 @@
             </section>
 
             <!-- ---------- planner: the decision ---------- -->
-            <section class="profile-card" id="decideCard" hidden>
+            <section class="profile-card" id="decideCard" hidden data-reveal>
                 <div class="profile-card-head">
                     <h2>Your decision</h2>
                     <span class="status" id="decideStatus">&hellip;</span>
@@ -211,7 +211,7 @@
             </section>
 
             <!-- ---------- read-only footer for a settled proposal ---------- -->
-            <section class="profile-card" id="settledCard" hidden>
+            <section class="profile-card" id="settledCard" hidden data-reveal>
                 <div class="profile-card-head">
                     <h2 id="settledHeading">Settled</h2>
                 </div>

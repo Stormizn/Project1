@@ -51,8 +51,8 @@
 
         <header class="topbar">
             <div class="page-title">
-                <h1>Messages</h1>
-                <p id="messagesDescription">Conversations with the brands and planners you're connected to.</p>
+                <h1 data-reveal>Messages</h1>
+                <p id="messagesDescription" data-reveal>Conversations with the brands and planners you're connected to.</p>
             </div>
         </header>
 
@@ -60,8 +60,8 @@
              messages table yet, or when the read is rejected. -->
         <section class="dash-section" id="fatalSection" hidden>
             <div class="empty-note">
-                <h3 id="fatalTitle">Messages are not available yet</h3>
-                <p id="fatalBody"></p>
+                <h3 id="fatalTitle" data-reveal>Messages are not available yet</h3>
+                <p id="fatalBody" data-reveal></p>
                 <div class="btn-row">
                     <a class="btn btn-ghost" href="connections.html">Back to Connections</a>
                 </div>
@@ -70,7 +70,7 @@
 
         <div class="inbox-layout" id="inboxLayout" hidden>
 
-            <section aria-label="Conversations">
+            <section aria-label="Conversations" data-reveal>
                 <div class="thread-list">
                     <div class="section-header">
                         <h2>Threads</h2>
@@ -80,7 +80,7 @@
                 </div>
             </section>
 
-            <section class="conversation" aria-label="Conversation" aria-live="polite">
+            <section class="conversation" aria-label="Conversation" aria-live="polite" data-reveal>
 
                 <div class="conversation-head" id="conversationHead" hidden>
                     <div class="profile-avatar thread-avatar" id="conversationAvatar">·</div>
@@ -92,7 +92,7 @@
 
                 <div class="conversation-log" id="conversationLog"></div>
 
-                <form class="composer" id="composer" hidden>
+                <form class="composer" id="composer" hidden data-reveal>
                     <label class="sr-only" for="messageInput" id="composerLabel">Message</label>
                     <textarea id="messageInput" rows="1" placeholder="Write a message…"
                               maxlength="2000" autocomplete="off"></textarea>
@@ -220,6 +220,7 @@
             const button = document.createElement("button");
             button.type = "button";
             button.className = "thread";
+            button.setAttribute("data-reveal", "");
             button.setAttribute("aria-current", thread.conn.id === activeId ? "true" : "false");
 
             const avatar = document.createElement("div");
@@ -287,6 +288,7 @@
 
             const empty = document.createElement("div");
             empty.className = "conversation-empty";
+            empty.setAttribute("data-reveal", "");
             const h = document.createElement("h3");
             h.textContent = "Pick a conversation";
             const p = document.createElement("p");
@@ -324,6 +326,7 @@
         if (!thread.messages.length) {
             const empty = document.createElement("div");
             empty.className = "conversation-empty";
+            empty.setAttribute("data-reveal", "");
             const h = document.createElement("h3");
             h.textContent = "No messages yet";
             const p = document.createElement("p");
