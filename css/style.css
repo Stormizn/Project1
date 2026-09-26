@@ -704,7 +704,7 @@ p { text-wrap: pretty; }
     .conversation { min-height: 440px; }
     .conversation-log { max-height: none; }
     .bubble { max-width: 86%; }
-}
+
     .section, .cta { padding-block: var(--s-9); }
     .hero { padding-block: var(--s-7) var(--s-9); }
     .hero-grid, .split { grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
