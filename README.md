@@ -64,7 +64,6 @@ LinkUp/
 │   ├── supabase.js       Shared Supabase client config
 │   └── auth-guard.js     Shared session guard (`requireSession()` / `getInitials()`)
 ├── supabase-schema.sql   SQL file to initialize the Supabase database
-└── ROADMAP.md            Full product + implementation roadmap
 ```
 
 > Public pages live at the project root and under `auth/`; private app pages
