@@ -159,11 +159,15 @@ CREATE TRIGGER messages_lock_content
 --
 -- Reads the values the signup form passes in
 -- `options.data` (Supabase stores these in raw_user_meta_data).
+-- `set search_path = ''` rather than `public`: SECURITY DEFINER, and a
+-- non-empty search path lets a caller shadow a name used below with an
+-- object of their own. Table refs are schema-qualified and pg_catalog
+-- is always reachable, so nothing depends on the path.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
   meta jsonb := NEW.raw_user_meta_data;
@@ -381,6 +385,43 @@ CREATE POLICY "Recipients can mark messages read"
 CREATE POLICY "Senders can delete their own messages"
   ON public.messages FOR DELETE
   USING (auth.uid() = sender_id);
+
+
+-- ---------- account deletion ----------
+-- Called from the profile page. The browser cannot delete an auth user
+-- directly -- auth.users is owned by supabase_auth_admin and the
+-- `authenticated` role has no DELETE on it -- so this SECURITY DEFINER
+-- function is the only route. It is scoped to auth.uid(), so a caller
+-- can only delete their own account.
+--
+-- Order matters: no foreign key onto public.users has ON DELETE CASCADE,
+-- so children have to go before the profile. `set search_path = ''`
+-- follows Supabase's guidance for SECURITY DEFINER functions; every
+-- reference is schema-qualified so nothing is shadowable.
+CREATE OR REPLACE FUNCTION public.delete_account()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  target uuid := auth.uid();
+BEGIN
+  IF target IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated.';
+  END IF;
+
+  DELETE FROM public.messages      WHERE sender_id = target;
+  DELETE FROM public.connections   WHERE from_user = target OR to_user = target;
+  DELETE FROM public.opportunities WHERE organizer_id = target;
+  DELETE FROM public.events        WHERE organizer_id = target;
+  DELETE FROM public.users         WHERE id = target;
+  DELETE FROM auth.users           WHERE id = target;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.delete_account() FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.delete_account() TO authenticated;
 
 
 -- =========================================================

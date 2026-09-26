@@ -137,6 +137,56 @@
         </div>
     </section>
 
+    <!-- ACCOUNT DELETION -->
+    <!-- Kept outside the grid so it never mixes with the profile cards,
+         and below the edit form so it is hard to hit by accident. -->
+    <section class="danger-zone" aria-labelledby="dangerHeading">
+        <div class="profile-card-head">
+            <h2 id="dangerHeading">Delete account</h2>
+        </div>
+        <p class="danger-lead">
+            Permanently removes your login and your profile. There is no
+            undo, no backup and no way to recover the account afterwards.
+        </p>
+
+        <button class="btn btn-danger" id="openDeleteBtn" type="button">
+            Delete my account
+        </button>
+
+        <!-- Hidden until "Delete my account" is clicked. Requires typing
+             DELETE so a stray click can't destroy an account. -->
+        <div class="confirm-panel" id="deletePanel" hidden>
+            <p class="confirm-question">
+                Deleting your account will also permanently remove:
+            </p>
+            <ul class="confirm-list">
+                <li>Your profile and sign-in details</li>
+                <li>Every event and opportunity you created</li>
+                <li>Every connection, in both directions</li>
+                <li>Every message you have sent</li>
+            </ul>
+            <p class="confirm-question">
+                To confirm, type <strong>DELETE</strong> below.
+            </p>
+
+            <label class="confirm-label" for="deleteConfirmInput">Type DELETE to enable the button</label>
+            <input type="text" id="deleteConfirmInput" class="confirm-input"
+                   autocomplete="off" autocapitalize="characters" spellcheck="false"
+                   placeholder="DELETE">
+
+            <p id="deleteMessage" class="form-message profile-message" role="status" aria-live="polite"></p>
+
+            <div class="edit-actions">
+                <button class="btn btn-danger" id="confirmDeleteBtn" type="button" disabled>
+                    Permanently delete my account
+                </button>
+                <button class="btn btn-ghost cancel-btn" id="cancelDeleteBtn" type="button">
+                    Keep my account
+                </button>
+            </div>
+        </div>
+    </section>
+
 </main>
 
 <script src="../js/script.js"></script>
@@ -337,6 +387,116 @@
             event.preventDefault();
             signOut();
         });
+
+    // ---------- account deletion ----------
+
+    // Typed twice on purpose. The RPC is irreversible and there is no
+    // server-side grace period, so the last click should be hard to make
+    // by accident.
+    const DELETE_CONFIRM_WORD = "DELETE";
+    let deleteInFlight = false;
+
+    const deletePanel = document.getElementById("deletePanel");
+    const deleteInput = document.getElementById("deleteConfirmInput");
+    const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+    const deleteMessage = document.getElementById("deleteMessage");
+
+    function syncConfirmButton() {
+        confirmDeleteBtn.disabled =
+            deleteInput.value.trim().toUpperCase() !== DELETE_CONFIRM_WORD;
+    }
+
+    function openDeletePanel() {
+        deletePanel.hidden = false;
+        deleteInput.value = "";
+        syncConfirmButton();
+        setFormMessage(deleteMessage, "", false);
+        deleteInput.focus();
+    }
+
+    function closeDeletePanel() {
+        if (deleteInFlight) return; // never interrupt a delete mid-flight
+        deletePanel.hidden = true;
+        deleteInput.value = "";
+        // Re-sync so the hidden panel is never left in an armed state.
+        syncConfirmButton();
+        setFormMessage(deleteMessage, "", false);
+        document.getElementById("openDeleteBtn").focus();
+    }
+
+    document.getElementById("openDeleteBtn")
+        .addEventListener("click", openDeletePanel);
+
+    document.getElementById("cancelDeleteBtn")
+        .addEventListener("click", closeDeletePanel);
+
+    deleteInput.addEventListener("input", syncConfirmButton);
+
+    // Enter on the confirm button should work like a click.
+    deleteInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && !confirmDeleteBtn.disabled) {
+            event.preventDefault();
+            confirmDeleteBtn.click();
+        }
+    });
+
+    confirmDeleteBtn.addEventListener("click", async function () {
+
+        if (deleteInFlight) return;
+
+        // Re-check, never trust the disabled attribute alone.
+        if (deleteInput.value.trim().toUpperCase() !== DELETE_CONFIRM_WORD) return;
+
+        deleteInFlight = true;
+        confirmDeleteBtn.disabled = true;
+        confirmDeleteBtn.textContent = "Deleting…";
+        deleteInput.disabled = true;
+        document.getElementById("cancelDeleteBtn").disabled = true;
+        setFormMessage(deleteMessage, "", false);
+
+        const db = window.supabaseClient;
+        let error = null;
+
+        try {
+            // delete_account() is SECURITY DEFINER and scoped to
+            // auth.uid(), so this can only ever remove the caller's own
+            // account. It is all-or-nothing: if the profile delete fails
+            // the function aborts and the login is left intact.
+            const result = await db.rpc("delete_account");
+            error = result.error;
+        } catch (err) {
+            error = err;
+        }
+
+        if (error) {
+            console.error("Account deletion failed:", error);
+            setFormMessage(
+                deleteMessage,
+                "Could not delete your account: " + getErrorMessage(error),
+                true
+            );
+            deleteInFlight = false;
+            confirmDeleteBtn.textContent = "Permanently delete my account";
+            deleteInput.disabled = false;
+            document.getElementById("cancelDeleteBtn").disabled = false;
+            syncConfirmButton();
+            return;
+        }
+
+        // The account is gone, so the session in this tab points at a
+        // user that no longer exists. Clear it locally rather than asking
+        // the server to revoke a session for a deleted user.
+        try {
+            await db.auth.signOut({ scope: "local" });
+        } catch (signOutError) {
+            // Non-fatal: the account is already deleted. Carry on to the
+            // login page so the dead session is not left behind.
+            console.warn("Local sign-out after deletion failed:", signOutError);
+        }
+
+        window.location.replace("../auth/login.html?deleted=1");
+
+    });
 
     watchSessionExpiry();
 

@@ -120,7 +120,9 @@ are driven by `script.js` (`data-reveal`, `data-tilt`, `data-parallax`).
       message body immutable after sending (only `read_at` can change)
 - ⏳ `partnerships.html` is still a placeholder
 - ⏳ Notifications are not implemented; the bell is shown disabled
-
+- Account deletion is available on the Profile page and requires explicit
+  confirmation (typed `DELETE`). The server-side RPC deletes data in
+  dependency order and removes the `auth.users` row. There is no undo.
 ## Setting up the database
 
 **Already have a database?** Run [`supabase-migrations.sql`](./supabase-migrations.sql)

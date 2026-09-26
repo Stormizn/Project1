@@ -23,12 +23,16 @@
     --inv-ink-2: #C3D2AE;
     --inv-line: #1E5E55;
     --danger: #8A2A12;
+    --danger-2: #6E1E0C;    /* hover / pressed  (≈10.5:1 on --surface) */
     --danger-bg: #FBDDC6;
 
     /* type */
     --font-display: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-script: "Leckerli One", "Brush Script MT", cursive;
     --font-sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* System mono only — no webfont download. Used where a value has to
+       be typed back exactly (delete confirmation). */
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     --fs-xs: 0.8125rem;                          /* 13 */
     --fs-sm: 0.9375rem;                          /* 15 */
     --fs-base: 1.0625rem;                        /* 17 */
@@ -94,6 +98,9 @@ a:hover { color: var(--ink); }
 h1, h2, h3, h4 { font-weight: 400; text-wrap: balance; }
 p { text-wrap: pretty; }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
+/* Keep `hidden` reliable: a later component rule that sets `display`
+   would otherwise silently defeat it. */
+[hidden] { display: none !important; }
 .visually-hidden {
     position: absolute !important; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
@@ -686,6 +693,82 @@ p { text-wrap: pretty; }
 .composer .btn:disabled { opacity: .5; cursor: not-allowed; }
 .composer-hint { padding: 0 var(--s-5) var(--s-4); font-size: 0.75rem; color: var(--ink-3); }
 .composer .form-message { margin: 0 var(--s-5) var(--s-3); }
+
+/* ---------- 13c. account deletion (danger zone) ----------
+   Uses --danger, which is the high-contrast pair on the cream page
+   background, and stays inside the card family rather than inventing a
+   new look. --surface, not --paper, keeps it visually grouped with the
+   profile cards above it. */
+
+.danger-zone {
+    margin-top: var(--s-8);
+    padding: var(--s-5) var(--s-6) var(--s-6);
+    background: var(--surface);
+    border: 1px solid var(--danger);
+    border-radius: var(--r-md);
+}
+.danger-zone .profile-card-head h2 { color: var(--danger); }
+
+.danger-lead {
+    margin: 0 0 var(--s-4);
+    max-width: 62ch;
+    font-size: var(--fs-sm);
+    color: var(--ink-2);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: var(--surface);
+    border: 1px solid var(--danger);
+}
+.btn-danger:hover { background: var(--danger-2); border-color: var(--danger-2); }
+.btn-danger:disabled { opacity: .5; cursor: not-allowed; }
+.btn-danger:disabled:hover { background: var(--danger); border-color: var(--danger); }
+
+.confirm-panel {
+    margin-top: var(--s-5);
+    padding-top: var(--s-5);
+    border-top: 1px solid var(--line);
+}
+.confirm-question { margin: 0 0 var(--s-2); font-size: var(--fs-sm); color: var(--ink-2); }
+.confirm-question strong {
+    font-family: var(--font-mono);
+    background: var(--danger-bg);
+    color: var(--danger);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    letter-spacing: 0.06em;
+}
+.confirm-list {
+    margin: 0 0 var(--s-4);
+    padding-left: 1.35em;
+    font-size: var(--fs-sm);
+    color: var(--ink-2);
+}
+.confirm-list li { margin-bottom: 0.15em; }
+
+.confirm-label {
+    display: block;
+    margin-bottom: var(--s-2);
+    font-size: 0.75rem;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+.confirm-input {
+    width: 100%;
+    max-width: 22ch;
+    padding: var(--s-3) var(--s-4);
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    font-family: var(--font-mono);
+    letter-spacing: 0.14em;
+}
+.confirm-input:focus-visible { outline: 2px solid var(--danger); outline-offset: 1px; }
+
+.confirm-panel .edit-actions { margin-top: var(--s-5); }
 
 /* 14. RESPONSIVE ------------------------------------------ */
 @media (max-width: 1100px) {

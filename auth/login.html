@@ -105,6 +105,11 @@
                 "click that link first — then sign in here.",
                 false
             );
+        } else if (urlParams.get("deleted")) {
+            showLoginMessage(
+                "Your account and all of its data have been permanently deleted.",
+                false
+            );
         }
 
         // REAL SUPABASE LOGIN

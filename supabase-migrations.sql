@@ -73,11 +73,17 @@ CREATE TRIGGER connections_set_updated_at
 -- 2. PROFILE CREATION TRIGGER
 -- =========================================================
 
+-- `set search_path = ''` rather than `public`: this is SECURITY
+-- DEFINER, and with a non-empty search path a caller who can create
+-- objects in a schema on that path can shadow a name used below and run
+-- code as the owner. Every table reference is schema-qualified, and
+-- pg_catalog (COALESCE / TRIM / NULLIF / SPLIT_PART) is always
+-- reachable, so nothing here depends on the path.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
   meta jsonb := NEW.raw_user_meta_data;
@@ -410,6 +416,72 @@ DROP POLICY IF EXISTS "Senders can delete their own messages" ON public.messages
 CREATE POLICY "Senders can delete their own messages"
   ON public.messages FOR DELETE
   USING (auth.uid() = sender_id);
+
+
+-- =========================================================
+-- 3c. ACCOUNT DELETION
+-- =========================================================
+-- Called from the profile page's "Delete account" button. The browser
+-- cannot do this itself: auth.users is owned by supabase_auth_admin and
+-- the `authenticated` role has no DELETE on it, so the only route from a
+-- frontend is a SECURITY DEFINER function.
+--
+-- SECURITY DEFINER runs with the privileges of the function owner
+-- (postgres), which is also what bypasses RLS on the tables below. The
+-- function is therefore the whole security boundary, and it is scoped to
+-- auth.uid() -- a caller can only ever delete their own account.
+--
+-- The order below is not arbitrary. NOT ONE of the foreign keys onto
+-- public.users has ON DELETE CASCADE (events.organizer_id,
+-- opportunities.organizer_id, connections.from_user / to_user,
+-- messages.sender_id), and public.users itself references auth.users
+-- without a cascade. Deleting the profile first therefore fails with an
+-- FK violation for any account that has ever created or joined
+-- anything. Children go first, then the profile, then the login.
+--
+-- `set search_path = ''` is required by Supabase's own guidance for any
+-- SECURITY DEFINER function: with a non-empty path, a caller who can
+-- create objects in a schema on that path can shadow a name used inside
+-- the function body and run code as the owner. Every reference below is
+-- schema-qualified instead.
+
+CREATE OR REPLACE FUNCTION public.delete_account()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  target uuid := auth.uid();
+BEGIN
+  IF target IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated.';
+  END IF;
+
+  -- Messages the user sent. Messages on connections they were part of
+  -- go with those connections on the next statement.
+  DELETE FROM public.messages WHERE sender_id = target;
+
+  -- Both directions: interest they sent, and interest sent to them.
+  -- Must precede opportunities/events, because connections.opportunity_id
+  -- points at opportunities with no cascade either.
+  DELETE FROM public.connections WHERE from_user = target OR to_user = target;
+
+  DELETE FROM public.opportunities WHERE organizer_id = target;
+  DELETE FROM public.events        WHERE organizer_id = target;
+
+  DELETE FROM public.users WHERE id = target;
+
+  -- Last, and the whole point: this removes the login itself, so the
+  -- account cannot be signed into again.
+  DELETE FROM auth.users WHERE id = target;
+END;
+$$;
+
+-- Postgres grants EXECUTE on new functions to PUBLIC by default, which
+-- would include `anon`. Lock it down to signed-in callers only.
+REVOKE ALL ON FUNCTION public.delete_account() FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.delete_account() TO authenticated;
 
 
 -- =========================================================
