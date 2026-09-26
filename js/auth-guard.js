@@ -13,6 +13,13 @@
 //
 // getInitials():
 //   - Turns "Alex Sharma" into "AS".
+//
+// getDisplayName(auth, fallback):
+//   - Resolves the name to show in the sidebar and greetings.
+//   - Prefers the profile name, then the local part of the
+//     sign-in email, then the fallback.
+//   - The public `users` table has no email column, so the
+//     email always comes from the Supabase auth user.
 
 async function requireSession() {
     // 1. Check if the user is signed in via Supabase
@@ -64,5 +71,25 @@ function getInitials(fullName) {
         .join("")
         .slice(0, 2)
         .toUpperCase();
+
+}
+
+function getDisplayName(auth, fallback) {
+
+    var defaultName = fallback || "LinkUp User";
+
+    if (!auth) return defaultName;
+
+    var profileName = (auth.profile && auth.profile.name)
+        ? auth.profile.name.trim()
+        : "";
+
+    if (profileName) return profileName;
+
+    var email = (auth.user && auth.user.email) ? auth.user.email : "";
+
+    if (email) return email.split("@")[0];
+
+    return defaultName;
 
 }

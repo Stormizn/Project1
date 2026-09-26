@@ -157,10 +157,7 @@
         }
 
         const fullName = profile.name ? profile.name.trim() : "";
-        const fallbackName = profile.email
-            ? profile.email.split("@")[0]
-            : "";
-        const displayName = fullName || fallbackName || "there";
+        const displayName = getDisplayName(auth, "there");
         const firstName = displayName.split(" ")[0];
         const isEventPlanner = profile.role === "event_planner";
 

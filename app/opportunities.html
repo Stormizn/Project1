@@ -208,12 +208,12 @@
         const profile = auth.profile;
         const isEventPlanner = profile.role === "event_planner";
         const fullName = profile.name ? profile.name.trim() : "";
-        const displayName = fullName || (profile.email ? profile.email.split("@")[0] : "");
+        const displayName = getDisplayName(auth);
 
         document.getElementById("sidebarAvatar").textContent =
             getInitials(fullName || "LinkUp User");
         document.getElementById("sidebarName").textContent =
-            displayName || "LinkUp User";
+            displayName;
         document.getElementById("sidebarRoleLabel").textContent =
             isEventPlanner ? "Event Planner Account" : "Brand Account";
 

@@ -185,7 +185,7 @@
             profile.organization_name || "—";
 
         document.getElementById("profileDisplayEmail").textContent =
-            profile.email || (currentUser ? currentUser.email : "") || "—";
+            (currentUser && currentUser.email) || "—";
 
         document.getElementById("profileDisplayLocation").textContent =
             profile.location || "—";

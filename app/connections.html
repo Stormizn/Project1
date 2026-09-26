@@ -109,17 +109,15 @@
 <!-- CONNECTIONS LOGIC -->
 <script>
 
+    // Supabase returns PostgrestError: message, details, hint, code.
     function getErrorMessage(err) {
-        const data = err && err.response && err.response.data;
-        if (data) {
-            for (const field of Object.keys(data)) {
-                const fieldError = data[field];
-                if (fieldError && fieldError.message) {
-                    return fieldError.message;
-                }
-            }
-        }
-        return (err && err.message) || "Something went wrong. Please try again.";
+        if (!err) return "Something went wrong. Please try again.";
+
+        const message = (err.message || "").trim();
+        const hint = (err.hint || "").trim();
+
+        if (message && hint) return message + " " + hint;
+        return message || hint || "Something went wrong. Please try again.";
     }
 
     function showMessage(text, isError) {
@@ -169,7 +167,9 @@
             const brand = conn.from_user || {};
             const opp = conn.opportunity || {};
             const brandName = brand.name ? brand.name.trim() : "A brand";
-            const brandEmail = brand.email ? brand.email : "";
+            const brandOrg = brand.organization_name
+                ? brand.organization_name.trim()
+                : (brand.location || "Brand account");
 
             const row = document.createElement("article");
             row.className = "profile-card";
@@ -187,14 +187,13 @@
                 conn.status === "rejected" ? "status--rejected" : "status--pending"
             );
             status.textContent = statusLabel(conn.status);
-            head.appendChild(statusapse);
+            head.appendChild(status);
 
             row.appendChild(head);
 
             const meta = document.createElement("p");
             meta.className = "muted";
-            meta.textContent = (opp.title || "Opportunity") + " · " +
-                (brandEmail || "Brand account");
+            meta.textContent = (opp.title || "Opportunity") + " · " + brandOrg;
             row.appendChild(meta);
 
             if (conn.status === "pending") {
@@ -257,14 +256,14 @@
                 conn.status === "rejected" ? "status--rejected" : "status--pending"
             );
             status.textContent = statusLabel(conn.status);
-            head.appendChild(statusapse);
+            head.appendChild(status);
 
             row.appendChild(head);
 
             const meta = document.createElement("p");
             meta.className = "muted";
             meta.textContent = "Requested from " +
-                ((planner && planner.name) || "the planner") + " · " + formatDate(conn.created);
+                ((planner && planner.name) || "the planner") + " · " + formatDate(conn.created_at);
             row.appendChild(meta);
 
             list.appendChild(row);
@@ -293,10 +292,10 @@
 
         const profile = auth.profile;
         const fullName = profile.name ? profile.name.trim() : "";
-        const displayName = fullName || (profile.email ? profile.email.split("@")[0] : "");
+        const displayName = getDisplayName(auth);
 
         document.getElementById("sidebarAvatar").textContent = getInitials(fullName || "LinkUp User");
-        document.getElementById("sidebarName").textContent = displayName || "LinkUp User";
+        document.getElementById("sidebarName").textContent = displayName;
         document.getElementById("sidebarRoleLabel").textContent =
             profile.role === "event_planner" ? "Event Planner Account" : "Brand Account";
 

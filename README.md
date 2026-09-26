@@ -1,4 +1,4 @@
-# LinkUp
+# LinkUp [Vibecoded cuz ts a school proj and i hate my school :D]
 
 > **A structured marketplace and network for brand–event partnerships and collaborations.**
 
