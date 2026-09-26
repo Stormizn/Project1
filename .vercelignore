@@ -1,0 +1,49 @@
+# ==========================================
+# LINKUP — VERCELIGNORE
+# ==========================================
+#
+# This is NOT a copy of .gitignore, and it does
+# a different job.
+#
+# .gitignore controls what gets COMMITTED.
+# This controls what gets SERVED.
+#
+# They are not interchangeable. Vercel excludes
+# .gitignore itself from the deployment output
+# but does NOT apply its patterns, so anything
+# ignored by git is still published unless it
+# is listed here. Only .vercelignore filters
+# the static output.
+#
+# That matters here: supabase-migrations.sql and
+# supabase-schema.sql contain the full schema,
+# every RLS policy and the body of the
+# SECURITY DEFINER functions. ROADMAP.md and
+# todos.md are private working notes. None of
+# that should be readable at
+# https://your-domain/supabase-migrations.sql.
+#
+# There is no build step and no dependency, so
+# there is nothing to compile — the site is
+# exactly the HTML, CSS and JS below.
+
+
+# ------------------------------------------
+# Deny everything, then allow only the site.
+#
+# A denylist is a trap: any dev file added
+# later is published by default and nobody
+# notices until it is indexed. This fails
+# closed instead. If you add a page, add it
+# here too.
+# ------------------------------------------
+/*
+
+!/index.html
+!/legal.html
+!/favicon.svg
+
+!/app/
+!/auth/
+!/css/
+!/js/

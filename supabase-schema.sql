@@ -98,6 +98,50 @@ CREATE TABLE public.messages (
   read_at TIMESTAMP WITH TIME ZONE
 );
 
+-- A proposal is the brand's actual offer on an accepted connection:
+-- what it gives, what it wants in return, what it will promote.
+--
+-- Keyed to the connection, not to a pair of user ids invented on the
+-- spot — the same reasoning as `messages`. It can only exist where a
+-- planner has already accepted the brand's interest, and the INSERT
+-- policy below re-checks that rather than trusting the client.
+--
+-- There is deliberately no `draft` status. A draft only ever exists in
+-- the browser form until the brand presses Send, so storing one would
+-- add a state that can never be resumed and can only go stale. The row
+-- appears as 'proposed' the moment it is saved.
+--
+-- `connection_id` is UNIQUE, which is what stops a double-click (or
+-- two tabs) creating two competing offers on the same connection.
+CREATE TABLE public.proposals (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  connection_id UUID REFERENCES public.connections(id) ON DELETE CASCADE NOT NULL UNIQUE,
+  brand_id UUID REFERENCES public.users(id) NOT NULL,
+  planner_id UUID REFERENCES public.users(id) NOT NULL,
+
+  -- What the brand puts in. Either half may be empty, but not both:
+  -- a proposal with no money and no product is not a proposal.
+  cash_amount NUMERIC(12,2) CHECK (cash_amount IS NULL OR cash_amount >= 0),
+  currency TEXT NOT NULL DEFAULT 'INR',
+  product_qty INTEGER CHECK (product_qty IS NULL OR product_qty > 0),
+  product_notes TEXT,
+  activation_idea TEXT,
+  promotion_plan TEXT,
+  deliverables TEXT,
+
+  status TEXT NOT NULL DEFAULT 'proposed'
+    CHECK (status IN ('proposed', 'changes_requested', 'accepted', 'rejected', 'withdrawn')),
+  -- The planner's reason, when they ask for changes or decline. Only
+  -- the planner can write it; the trigger below enforces that.
+  planner_note TEXT,
+
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+
+  CONSTRAINT proposals_no_self_deal CHECK (brand_id <> planner_id),
+  CONSTRAINT proposals_not_empty CHECK (cash_amount IS NOT NULL OR product_qty IS NOT NULL)
+);
+
 
 -- =========================================================
 -- 2. TRIGGERS
@@ -153,6 +197,82 @@ $$;
 CREATE TRIGGER messages_lock_content
   BEFORE UPDATE ON public.messages
   FOR EACH ROW EXECUTE FUNCTION public.messages_lock_content();
+
+CREATE TRIGGER proposals_set_updated_at
+  BEFORE UPDATE ON public.proposals
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- RLS decides WHO may update a proposal. It cannot decide WHICH
+-- COLUMNS they may change, so without this trigger a planner could
+-- rewrite the brand's cash amount and product quantity, and a brand
+-- could rewrite the planner's verdict note.
+--
+-- This also owns the state machine, so an illegal jump (accepted ->
+-- proposed) fails in the database rather than only in the UI:
+--
+--   proposed -----------> changes_requested | accepted | rejected | withdrawn
+--   changes_requested -> proposed | rejected | withdrawn
+--   accepted / rejected / withdrawn  -> final, no transitions out
+--
+-- The brand moves it to 'proposed' (resubmitted) or 'withdrawn';
+-- the planner moves it to 'changes_requested', 'accepted' or
+-- 'rejected'. That split is enforced by the RLS policies, which only
+-- allow each side to write the statuses it owns.
+CREATE OR REPLACE FUNCTION public.proposals_state_guard()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- The parties and the connection are fixed for the life of the row.
+  -- Otherwise a brand could repoint a proposal at a different planner
+  -- and the RLS check that validated it would no longer describe it.
+  IF NEW.connection_id IS DISTINCT FROM OLD.connection_id
+     OR NEW.brand_id IS DISTINCT FROM OLD.brand_id
+     OR NEW.planner_id IS DISTINCT FROM OLD.planner_id
+     OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'proposals: the connection and the two parties cannot be changed';
+  END IF;
+
+  -- Column ownership.
+  IF auth.uid() = OLD.brand_id THEN
+    IF NEW.planner_note IS DISTINCT FROM OLD.planner_note THEN
+      RAISE EXCEPTION 'proposals: only the planner can write the planner note';
+    END IF;
+  ELSIF auth.uid() = OLD.planner_id THEN
+    IF NEW.cash_amount IS DISTINCT FROM OLD.cash_amount
+       OR NEW.currency IS DISTINCT FROM OLD.currency
+       OR NEW.product_qty IS DISTINCT FROM OLD.product_qty
+       OR NEW.product_notes IS DISTINCT FROM OLD.product_notes
+       OR NEW.activation_idea IS DISTINCT FROM OLD.activation_idea
+       OR NEW.promotion_plan IS DISTINCT FROM OLD.promotion_plan
+       OR NEW.deliverables IS DISTINCT FROM OLD.deliverables THEN
+      RAISE EXCEPTION 'proposals: only the brand can change what is being offered';
+    END IF;
+  END IF;
+
+  IF NEW.status = OLD.status THEN
+    RETURN NEW;
+  END IF;
+
+  IF OLD.status = 'proposed' THEN
+    IF NEW.status NOT IN ('changes_requested', 'accepted', 'rejected', 'withdrawn') THEN
+      RAISE EXCEPTION 'proposals: cannot change a proposal from proposed to %', NEW.status;
+    END IF;
+  ELSIF OLD.status = 'changes_requested' THEN
+    IF NEW.status NOT IN ('proposed', 'rejected', 'withdrawn') THEN
+      RAISE EXCEPTION 'proposals: cannot change a proposal from changes_requested to %', NEW.status;
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'proposals: a % proposal is final and cannot be changed', OLD.status;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER proposals_state_guard
+  BEFORE UPDATE ON public.proposals
+  FOR EACH ROW EXECUTE FUNCTION public.proposals_state_guard();
 
 
 -- Create the public.users profile automatically on signup.
@@ -387,6 +507,78 @@ CREATE POLICY "Senders can delete their own messages"
   USING (auth.uid() = sender_id);
 
 
+-- ---------- proposals ----------
+-- A proposal is negotiated privately between the two parties on one
+-- connection, so it is narrower than `messages`: not every signed-in
+-- user can see that a proposal exists, only the brand that wrote it and
+-- the planner who received it.
+ALTER TABLE public.proposals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Proposal parties can read proposals"
+  ON public.proposals FOR SELECT
+  USING (auth.uid() = brand_id OR auth.uid() = planner_id);
+
+-- Only a brand may write the offer, only on a connection they have
+-- already been accepted on, and only in the direction that connection
+-- actually runs (from_user = brand, to_user = planner). The row can
+-- therefore never describe a partnership the connection does not have.
+CREATE POLICY "Brands can send proposals"
+  ON public.proposals FOR INSERT
+  WITH CHECK (
+    auth.uid() = brand_id
+    AND status = 'proposed'
+    AND EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = auth.uid() AND u.role = 'brand'
+    )
+    AND EXISTS (
+      SELECT 1 FROM public.connections c
+      WHERE c.id = connection_id
+        AND c.status = 'accepted'
+        AND c.from_user = brand_id
+        AND c.to_user = planner_id
+    )
+  );
+
+-- The brand revises the terms or gives up. Both USING and WITH CHECK
+-- name the statuses, not just the user: without that in USING a brand
+-- could reopen an already-accepted proposal by moving it back to
+-- 'proposed'. The trigger blocks the same move, so this is belt and
+-- braces rather than the only defence.
+CREATE POLICY "Brands can revise or withdraw their own proposals"
+  ON public.proposals FOR UPDATE
+  USING (
+    auth.uid() = brand_id
+    AND status IN ('proposed', 'changes_requested')
+  )
+  WITH CHECK (
+    auth.uid() = brand_id
+    AND status IN ('proposed', 'withdrawn')
+  );
+
+-- The planner answers. The WITH CHECK is the important half: it is the
+-- only thing stopping a planner from marking their own proposal
+-- 'accepted' with no changes requested, and the only thing stopping
+-- them from editing the cash amount while they are at it.
+CREATE POLICY "Planners can respond to proposals"
+  ON public.proposals FOR UPDATE
+  USING (
+    auth.uid() = planner_id
+    AND status IN ('proposed', 'changes_requested')
+  )
+  WITH CHECK (
+    auth.uid() = planner_id
+    AND status IN ('changes_requested', 'accepted', 'rejected')
+  );
+
+-- There is no DELETE policy on purpose. Withdrawing is a status, which
+-- keeps the history of what was offered; a hard delete would also mean
+-- a brand could remove the record of a proposal they had already made.
+-- Rows only disappear when an account is deleted, and that path is
+-- public.delete_account() below, which is SECURITY DEFINER and so does
+-- not go through RLS at all.
+
+
 -- ---------- account deletion ----------
 -- Called from the profile page. The browser cannot delete an auth user
 -- directly -- auth.users is owned by supabase_auth_admin and the
@@ -412,6 +604,7 @@ BEGIN
   END IF;
 
   DELETE FROM public.messages      WHERE sender_id = target;
+  DELETE FROM public.proposals     WHERE brand_id = target OR planner_id = target;
   DELETE FROM public.connections   WHERE from_user = target OR to_user = target;
   DELETE FROM public.opportunities WHERE organizer_id = target;
   DELETE FROM public.events        WHERE organizer_id = target;
@@ -456,3 +649,9 @@ CREATE INDEX messages_sender_id_idx            ON public.messages (sender_id);
 CREATE INDEX messages_unread_idx
   ON public.messages (connection_id)
   WHERE read_at IS NULL;
+
+-- proposals.connection_id is already unique (one offer per connection),
+-- which is the index the detail page reads. These two cover the two
+-- list views: "proposals I sent" and "proposals I received".
+CREATE INDEX proposals_brand_id_idx   ON public.proposals (brand_id);
+CREATE INDEX proposals_planner_id_idx ON public.proposals (planner_id);

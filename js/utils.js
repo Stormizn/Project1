@@ -71,6 +71,68 @@ function opportunityStatusLabel(status) {
     return status === "open" ? "Open" : "Closed";
 }
 
+// proposals.status -> human label.
+//
+// Five values, and the wording matters: "Declined" is a decision the
+// planner made, "Withdrawn" is the brand walking away, and they are not
+// the same thing to the person on the other side.
+function proposalStatusLabel(status) {
+    switch (status) {
+        case "proposed": return "Awaiting review";
+        case "changes_requested": return "Changes requested";
+        case "accepted": return "Accepted";
+        case "rejected": return "Declined";
+        case "withdrawn": return "Withdrawn";
+        default: return "Unknown";
+    }
+}
+
+// The three states a proposal can be edited in. Kept here so the list
+// page, the detail page and the tests all agree on one list.
+var PROPOSAL_EDITABLE = ["proposed", "changes_requested"];
+var PROPOSAL_FINAL = ["accepted", "rejected", "withdrawn"];
+
+function isProposalEditable(status) {
+    return PROPOSAL_EDITABLE.indexOf(status) !== -1;
+}
+
+function isProposalFinal(status) {
+    return PROPOSAL_FINAL.indexOf(status) !== -1;
+}
+
+// A proposal is only worth showing money for if there is money.
+// Returns "" when there is none, so the caller can fall back.
+function formatMoney(amount, currency) {
+    if (amount === null || amount === undefined || amount === "") return "";
+
+    var value = Number(amount);
+    if (isNaN(value)) return "";
+
+    try {
+        return new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency: (currency || "INR").toUpperCase(),
+            maximumFractionDigits: 0
+        }).format(value);
+    } catch (err) {
+        // An invalid currency code throws a RangeError. Showing the bare
+        // number beats showing nothing.
+        return String(value);
+    }
+}
+
+// Postgres/PostgREST error codes that mean "this table or column is not
+// on the database yet", which is what happens when the migration has
+// not been run. The raw PostgREST string is worse than useless in a UI,
+// so callers turn it into a sentence.
+function isMissingTable(err) {
+    if (!err) return false;
+    return err.code === "42P01"
+        || err.code === "PGRST205"
+        || err.code === "PGRST204"
+        || /does not exist/i.test(err.message || "");
+}
+
 // 1 opportunity / 2 opportunities
 function plural(count, singular, pluralForm) {
     var n = Number(count) || 0;
@@ -85,6 +147,20 @@ function statusChip(status, label) {
         status === "rejected" || status === "closed" ? "rejected" : "pending"
     );
     chip.textContent = label || connectionStatusLabel(status);
+    return chip;
+}
+
+// The same chip, but the colour follows the proposal state machine.
+// "Changes requested" is still live, so it stays neutral rather than
+// reading as a rejection; both final-but-not-accepted states read as
+// closed.
+function proposalStatusChip(status) {
+    var chip = document.createElement("span");
+    chip.className = "status status--" + (
+        status === "accepted" ? "accepted" :
+        PROPOSAL_FINAL.indexOf(status) !== -1 ? "rejected" : "pending"
+    );
+    chip.textContent = proposalStatusLabel(status);
     return chip;
 }
 

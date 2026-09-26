@@ -31,6 +31,10 @@
 --  10. There was no `messages` table at all, so the Messages page
 --      had nothing to read. It is keyed to a connection and gated
 --      on that connection being 'accepted'.
+--  11. There was no `proposals` table, so a partnership could be
+--      discussed in messages but never actually put on paper. It is
+--      keyed to a connection for the same reason, and its state
+--      machine is enforced by a trigger rather than by the UI.
 -- =========================================================
 
 
@@ -462,6 +466,13 @@ BEGIN
   -- go with those connections on the next statement.
   DELETE FROM public.messages WHERE sender_id = target;
 
+  -- Proposals the user wrote or received. This one is belt and braces:
+  -- proposals.connection_id cascades from connections, so the next
+  -- statement would take them anyway. Naming them explicitly means the
+  -- delete order does not silently depend on a cascade someone could
+  -- remove later.
+  DELETE FROM public.proposals WHERE brand_id = target OR planner_id = target;
+
   -- Both directions: interest they sent, and interest sent to them.
   -- Must precede opportunities/events, because connections.opportunity_id
   -- points at opportunities with no cascade either.
@@ -482,6 +493,194 @@ $$;
 -- would include `anon`. Lock it down to signed-in callers only.
 REVOKE ALL ON FUNCTION public.delete_account() FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.delete_account() TO authenticated;
+
+
+-- =========================================================
+-- 3d. PROPOSALS
+-- =========================================================
+-- The brand's actual offer on a connection the planner has already
+-- accepted: cash, product, the activation idea, the promotion plan,
+-- the deliverables. Keyed to the connection for the same reason
+-- `messages` is — the offer is only meaningful between two people who
+-- have already agreed to talk, and the RLS below re-uses `connections`
+-- as the single source of truth for that instead of trusting the ids
+-- the browser sent.
+--
+-- IF NOT EXISTS on purpose, like `messages`: this file is re-runnable,
+-- and a DROP + CREATE would throw away every proposal already made.
+--
+-- The CHECK on status is the state machine's vocabulary. The legal
+-- moves between those values are enforced by proposals_state_guard()
+-- below, not by this constraint, because a CHECK cannot see the OLD row.
+--
+--   proposed -----------> changes_requested | accepted | rejected | withdrawn
+--   changes_requested -> proposed | rejected | withdrawn
+--   accepted / rejected / withdrawn  -> final
+--
+-- There is no 'draft'. A draft exists only in the browser form until
+-- the brand presses Send, so a stored one could never be resumed.
+
+CREATE TABLE IF NOT EXISTS public.proposals (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  -- UNIQUE is what makes "one live offer per connection" a fact about
+  -- the data rather than a promise about the UI. A double-click, or two
+  -- tabs open on the same connection, cannot produce two competing
+  -- offers: the second insert fails on the unique constraint.
+  connection_id UUID REFERENCES public.connections(id) ON DELETE CASCADE NOT NULL UNIQUE,
+  brand_id UUID REFERENCES public.users(id) NOT NULL,
+  planner_id UUID REFERENCES public.users(id) NOT NULL,
+
+  -- Either money or product, but not neither. An offer row with an
+  -- empty cash_amount AND a NULL product_qty is not an offer, and
+  -- letting one exist means the planner sees a "proposal" with nothing
+  -- in it and has to ask what the brand actually wants.
+  cash_amount NUMERIC(12,2) CHECK (cash_amount IS NULL OR cash_amount >= 0),
+  currency TEXT NOT NULL DEFAULT 'INR',
+  product_qty INTEGER CHECK (product_qty IS NULL OR product_qty > 0),
+  product_notes TEXT,
+  activation_idea TEXT,
+  promotion_plan TEXT,
+  deliverables TEXT,
+
+  status TEXT NOT NULL DEFAULT 'proposed'
+    CHECK (status IN ('proposed', 'changes_requested', 'accepted', 'rejected', 'withdrawn')),
+  planner_note TEXT,
+
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+
+  CONSTRAINT proposals_no_self_deal CHECK (brand_id <> planner_id),
+  CONSTRAINT proposals_not_empty CHECK (cash_amount IS NOT NULL OR product_qty IS NOT NULL)
+);
+
+-- See supabase-schema.sql section 2 for the full reasoning. Short
+-- version: RLS says WHO may update; it cannot say WHICH COLUMNS, so a
+-- planner could otherwise rewrite the cash amount, and a brand could
+-- rewrite the planner's verdict. The same trigger owns the transitions.
+CREATE OR REPLACE FUNCTION public.proposals_state_guard()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.connection_id IS DISTINCT FROM OLD.connection_id
+     OR NEW.brand_id IS DISTINCT FROM OLD.brand_id
+     OR NEW.planner_id IS DISTINCT FROM OLD.planner_id
+     OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'proposals: the connection and the two parties cannot be changed';
+  END IF;
+
+  IF auth.uid() = OLD.brand_id THEN
+    IF NEW.planner_note IS DISTINCT FROM OLD.planner_note THEN
+      RAISE EXCEPTION 'proposals: only the planner can write the planner note';
+    END IF;
+  ELSIF auth.uid() = OLD.planner_id THEN
+    IF NEW.cash_amount IS DISTINCT FROM OLD.cash_amount
+       OR NEW.currency IS DISTINCT FROM OLD.currency
+       OR NEW.product_qty IS DISTINCT FROM OLD.product_qty
+       OR NEW.product_notes IS DISTINCT FROM OLD.product_notes
+       OR NEW.activation_idea IS DISTINCT FROM OLD.activation_idea
+       OR NEW.promotion_plan IS DISTINCT FROM OLD.promotion_plan
+       OR NEW.deliverables IS DISTINCT FROM OLD.deliverables THEN
+      RAISE EXCEPTION 'proposals: only the brand can change what is being offered';
+    END IF;
+  END IF;
+
+  IF NEW.status = OLD.status THEN
+    RETURN NEW;
+  END IF;
+
+  IF OLD.status = 'proposed' THEN
+    IF NEW.status NOT IN ('changes_requested', 'accepted', 'rejected', 'withdrawn') THEN
+      RAISE EXCEPTION 'proposals: cannot change a proposal from proposed to %', NEW.status;
+    END IF;
+  ELSIF OLD.status = 'changes_requested' THEN
+    IF NEW.status NOT IN ('proposed', 'rejected', 'withdrawn') THEN
+      RAISE EXCEPTION 'proposals: cannot change a proposal from changes_requested to %', NEW.status;
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'proposals: a % proposal is final and cannot be changed', OLD.status;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS proposals_set_updated_at ON public.proposals;
+CREATE TRIGGER proposals_set_updated_at
+  BEFORE UPDATE ON public.proposals
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS proposals_state_guard ON public.proposals;
+CREATE TRIGGER proposals_state_guard
+  BEFORE UPDATE ON public.proposals
+  FOR EACH ROW EXECUTE FUNCTION public.proposals_state_guard();
+
+ALTER TABLE public.proposals ENABLE ROW LEVEL SECURITY;
+
+-- Stricter than `messages` on purpose: not every signed-in user can
+-- discover that a proposal exists. Only the brand that wrote it and the
+-- planner who received it.
+DROP POLICY IF EXISTS "Proposal parties can read proposals" ON public.proposals;
+CREATE POLICY "Proposal parties can read proposals"
+  ON public.proposals FOR SELECT
+  USING (auth.uid() = brand_id OR auth.uid() = planner_id);
+
+DROP POLICY IF EXISTS "Brands can send proposals" ON public.proposals;
+CREATE POLICY "Brands can send proposals"
+  ON public.proposals FOR INSERT
+  WITH CHECK (
+    auth.uid() = brand_id
+    AND status = 'proposed'
+    AND EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = auth.uid() AND u.role = 'brand'
+    )
+    -- The connection is the source of truth. It has to be accepted, and
+    -- it has to run in the direction the row claims: the brand is
+    -- from_user, the planner is to_user. Without the last two tests a
+    -- brand could file an offer naming a planner it is not connected to.
+    AND EXISTS (
+      SELECT 1 FROM public.connections c
+      WHERE c.id = connection_id
+        AND c.status = 'accepted'
+        AND c.from_user = brand_id
+        AND c.to_user = planner_id
+    )
+  );
+
+-- USING names the statuses as well as the user, so a brand cannot
+-- reopen an accepted proposal by moving it back to 'proposed'.
+DROP POLICY IF EXISTS "Brands can revise or withdraw their own proposals" ON public.proposals;
+CREATE POLICY "Brands can revise or withdraw their own proposals"
+  ON public.proposals FOR UPDATE
+  USING (
+    auth.uid() = brand_id
+    AND status IN ('proposed', 'changes_requested')
+  )
+  WITH CHECK (
+    auth.uid() = brand_id
+    AND status IN ('proposed', 'withdrawn')
+  );
+
+-- WITH CHECK is the load-bearing half here: it is the only thing
+-- stopping a planner from self-accepting, or from editing the cash
+-- amount while they are answering.
+DROP POLICY IF EXISTS "Planners can respond to proposals" ON public.proposals;
+CREATE POLICY "Planners can respond to proposals"
+  ON public.proposals FOR UPDATE
+  USING (
+    auth.uid() = planner_id
+    AND status IN ('proposed', 'changes_requested')
+  )
+  WITH CHECK (
+    auth.uid() = planner_id
+    AND status IN ('changes_requested', 'accepted', 'rejected')
+  );
+
+-- No DELETE policy, on purpose. Withdrawing is a status, which keeps
+-- the record of what was offered. The only thing that removes a
+-- proposal is public.delete_account() above, which is SECURITY DEFINER
+-- and bypasses RLS entirely.
 
 
 -- =========================================================
@@ -531,7 +730,18 @@ CREATE INDEX IF NOT EXISTS messages_unread_idx
   ON public.messages (connection_id)
   WHERE read_at IS NULL;
 
+-- proposals.connection_id is already unique, which is the index the
+-- detail page reads. These two cover the two list views.
+CREATE INDEX IF NOT EXISTS proposals_brand_id_idx   ON public.proposals (brand_id);
+CREATE INDEX IF NOT EXISTS proposals_planner_id_idx ON public.proposals (planner_id);
+
 
 -- =========================================================
--- DONE — now run the signup flow again in the browser.
+-- 5. DONE
+-- =========================================================
+-- Re-run the signup flow in the browser, then open Proposals from the
+-- sidebar. If the page says "Proposals are not set up on this database
+-- yet", PostgREST has not reloaded its schema cache yet — wait a few
+-- seconds and reload. If it persists, check that this whole file ran
+-- without a red error partway through.
 -- =========================================================

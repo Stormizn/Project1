@@ -27,7 +27,7 @@
                 <a href="opportunities.html"><span class="nav-icon">03</span><span>Opportunities</span></a>
                 <a href="connections.html"><span class="nav-icon">04</span><span>Connections</span></a>
                 <a href="messages.html" class="active" aria-current="page"><span class="nav-icon">05</span><span>Messages</span></a>
-                <a href="partnerships.html"><span class="nav-icon">06</span><span>Partnerships</span></a>
+                <a href="proposals.html"><span class="nav-icon">06</span><span>Proposals</span></a>
             </nav>
             <div class="nav-title">Account</div>
             <nav class="dashboard-nav" aria-label="Account">
@@ -133,18 +133,12 @@
     // Helpers
     // ------------------------------------------------------------
 
-    // Postgres/PostgREST error codes that mean "this table or column
-    // does not exist on the database", which is exactly what happens
-    // when supabase-migrations.sql has not been run yet. Showing the
-    // raw PostgREST string to a user is worse than useless, so it gets
-    // a sentence written for it.
-    function isMissingTable(err) {
-        if (!err) return false;
-        return err.code === "42P01"
-            || err.code === "PGRST205"
-            || err.code === "PGRST204"
-            || /does not exist/i.test(err.message || "");
-    }
+    // isMissingTable() lives in js/utils.js. It maps the
+    // Postgres/PostgREST codes for "this table or column does not exist
+    // on the database" — exactly what happens when
+    // supabase-migrations.sql has not been run yet — so a missing
+    // table gets a sentence written for it instead of a raw PostgREST
+    // string.
 
     function showFatal(title, body) {
         document.getElementById("fatalTitle").textContent = title;

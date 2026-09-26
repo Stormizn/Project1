@@ -19,7 +19,7 @@ HTML, CSS and JavaScript with **no framework and no build step**.
 ## Run it
 
 ```bash
-node scripts/serve.mjs      # http://localhost:8080
+node scripts/serve.mjs               # http://localhost:8080
 ```
 
 Pressing F5 in VS Code does the same thing. There is no `npm install`
@@ -29,17 +29,35 @@ and there is no `package.json` — that is intentional.
 
 ```bash
 node scripts/verify.mjs                    # site-wide static checks
-node scripts/verify-delete-account.cjs      # deletion flow behaviour
+node scripts/verify-delete-account.cjs     # deletion flow behaviour
+node scripts/verify-proposals.cjs          # proposal flow behaviour
+node scripts/verify-tag-balance.mjs        # proves the tag check works
+node scripts/verify-deploy.mjs             # what Vercel would publish
+node scripts/verify-rls-live.mjs           # read-only preflight, safe
+node scripts/verify-rls-live.mjs --full    # REAL sessions, writes, self-cleans
+node scripts/verify-rls-live.mjs --cleanup # remove leftovers from a crash
 ```
 
 `verify.mjs` checks that internal links resolve, inline scripts parse,
-`getElementById` targets exist, ids are unique, CSS variables all
-resolve, and no privileged key is in browser-served code.
+`getElementById` targets exist, ids are unique, HTML tags balance, CSS
+variables all resolve, and no privileged key is in browser-served code.
 
-**Neither script can prove an RLS rule works.** The UI already hides the
-cases the rules are supposed to block, so a green browser test looks
-identical whether or not the policy exists in the database. Only a real
-signed-in session against the real database proves that.
+The `.cjs` suites extract a page's inline `<script>` and run it in a
+`vm` sandbox against a fake DOM and a fake Supabase client, so the real
+gating, validation and error-handling logic is exercised with no browser
+and no database. `verify-tag-balance.mjs` exists because a check nobody
+has seen fail is a check nobody can trust.
+
+`verify-rls-live.mjs` is the one that talks to the real database. It
+signs up three throwaway accounts through the real auth API, gets real
+JWTs, and lets PostgREST enforce the policies — the only way to prove a
+rule exists rather than merely assuming it. `--full` writes and then
+deletes everything; `--cleanup` removes accounts left by a crashed run.
+
+**The other five suites still cannot prove an RLS rule works.** The UI
+already hides the cases the rules are supposed to block, so a green
+browser test looks identical whether or not the policy exists in the
+database. That gap is what `--full` closes, and it is now closed.
 
 ## Hard rules
 
@@ -62,14 +80,32 @@ signed-in session against the real database proves that.
 
 **No foreign key onto `public.users` has `ON DELETE CASCADE`** — not
 `events.organizer_id`, `opportunities.organizer_id`,
-`connections.from_user` / `to_user`, or `messages.sender_id`. Any code
-that removes a user must delete children first, in this order:
+`connections.from_user` / `to_user`, `messages.sender_id`, or
+`proposals.brand_id` / `planner_id`. Any code that removes a user must
+delete children first, in this order:
 
 ```
-messages -> connections -> opportunities -> events -> users -> auth.users
+proposals -> messages -> connections -> opportunities -> events -> users -> auth.users
 ```
 
-(`opportunities.event_id` and `messages.connection_id` *do* cascade.)
+(`opportunities.event_id`, `messages.connection_id` and
+`proposals.connection_id` *do* cascade.)
+
+**The `proposals` state machine lives in `proposals_state_guard()`, not
+in the UI.** RLS decides *who* may update a row; it cannot decide *which
+columns* or *which transitions*. The trigger is what stops a planner
+rewriting the cash amount, a brand rewriting the planner's note, and
+anyone reopening a final proposal:
+
+```
+proposed -----------> changes_requested | accepted | rejected | withdrawn
+changes_requested -> proposed | rejected | withdrawn
+accepted / rejected / withdrawn  -> final, no transitions out
+```
+
+Adding a status to the `CHECK` without adding the transition to that
+function is how the two halves drift apart. Cover it in
+`scripts/verify-proposals.cjs` too.
 
 **`auth.users` cannot be deleted from the browser.** It is owned by
 `supabase_auth_admin` and the `authenticated` role has no `DELETE` on it.
@@ -97,6 +133,19 @@ blocks the script from loading entirely.
 
 **`legal.html` documents what the code actually does**, including the
 tables and the RLS rules. Re-read it if the schema changes.
+
+**`.gitignore` and `.vercelignore` are not interchangeable.** Git
+controls what is *committed*; `.vercelignore` controls what is
+*published*. Vercel excludes `.gitignore` itself from the output but
+does **not** apply its patterns, so every file git ignores is still
+served unless `.vercelignore` also lists it. Without it,
+`supabase-migrations.sql` — the whole schema, every RLS policy and both
+`SECURITY DEFINER` bodies — is readable at
+`https://your-domain/supabase-migrations.sql`. The file is an allowlist
+on purpose, so a dev file added later is excluded by default rather than
+published by default. `node scripts/verify-deploy.mjs` recomputes
+Vercel's own filter and fails in both directions: a leaked file, and a
+page that would 404 in production only.
 
 ## Database changes
 

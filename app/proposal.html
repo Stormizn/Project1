@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="theme-color" content="#FFEFB3">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposal | LinkUp</title>
+    <script>document.documentElement.classList.add("js");</script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="app dashboard">
+
+    <aside class="sidebar">
+        <a href="dashboard.html" class="logo dashboard-logo">Link<em>Up</em></a>
+
+        <div class="sidebar-nav">
+            <div class="nav-title">Platform</div>
+            <nav class="dashboard-nav" aria-label="Platform">
+                <a href="dashboard.html"><span class="nav-icon">01</span><span>Dashboard</span></a>
+                <a href="discover.html"><span class="nav-icon">02</span><span>Discover Events</span></a>
+                <a href="opportunities.html"><span class="nav-icon">03</span><span>Opportunities</span></a>
+                <a href="connections.html"><span class="nav-icon">04</span><span>Connections</span></a>
+                <a href="messages.html"><span class="nav-icon">05</span><span>Messages</span></a>
+                <a href="proposals.html" class="active" aria-current="page"><span class="nav-icon">06</span><span>Proposals</span></a>
+            </nav>
+            <div class="nav-title">Account</div>
+            <nav class="dashboard-nav" aria-label="Account">
+                <a href="profile.html"><span class="nav-icon">07</span><span>Profile</span></a>
+                <a href="../auth/login.html" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
+            </nav>
+        </div>
+
+        <div class="sidebar-bottom">
+            <a href="profile.html" class="sidebar-profile">
+                <div class="profile-avatar" id="sidebarAvatar">…</div>
+                <div class="sidebar-profile-text">
+                    <strong id="sidebarName">Loading…</strong>
+                    <span id="sidebarRoleLabel">…</span>
+                </div>
+            </a>
+        </div>
+    </aside>
+
+    <main class="dashboard-main">
+
+        <header class="topbar">
+            <div class="page-title">
+                <h1 id="pageTitle">Proposal</h1>
+                <p id="pageSubtitle">The offer, and where it stands.</p>
+            </div>
+            <a href="proposals.html" class="back-link" style="margin-bottom: 0;">&larr; All proposals</a>
+        </header>
+
+        <div id="proposalContainer">
+
+            <!-- Replaces the page body when the database has no
+                 proposals table, or the row cannot be read. -->
+            <section class="dash-section" id="fatalSection" hidden>
+                <div class="empty-note">
+                    <h3 id="fatalTitle">Proposal unavailable</h3>
+                    <p id="fatalBody"></p>
+                    <div class="btn-row">
+                        <a class="btn btn-ghost" href="proposals.html">Back to Proposals</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ---------- the offer itself ---------- -->
+            <section class="profile-card" id="termsCard" hidden>
+                <div class="profile-card-head">
+                    <h2 id="termsHeading">What's on the table</h2>
+                    <span class="status" id="proposalStatus">&hellip;</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Opportunity</span>
+                    <span class="info-value" id="rowOpportunity">&hellip;</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label" id="partyLabel">Partner</span>
+                    <span class="info-value" id="rowParty">&hellip;</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Cash</span>
+                    <span class="info-value" id="rowCash">&hellip;</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Product</span>
+                    <span class="info-value" id="rowProduct">&hellip;</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Activation idea</span>
+                    <span class="info-value" id="rowActivation">&hellip;</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Promotion plan</span>
+                    <span class="info-value" id="rowPromotion">&hellip;</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Deliverables</span>
+                    <span class="info-value" id="rowDeliverables">&hellip;</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Last updated</span>
+                    <span class="info-value" id="rowUpdated">&hellip;</span>
+                </div>
+            </section>
+
+            <!-- ---------- the planner's note ---------- -->
+            <section class="profile-card" id="noteCard" hidden>
+                <div class="profile-card-head">
+                    <h2>From the planner</h2>
+                </div>
+                <p class="info-value" id="plannerNote" style="line-height: 1.6;"></p>
+            </section>
+
+            <!-- ---------- brand: the editable offer ---------- -->
+            <section class="profile-card" id="editCard" hidden>
+                <div class="profile-card-head">
+                    <h2 id="editHeading">Your offer</h2>
+                </div>
+                <p class="muted" style="font-size: var(--fs-sm); max-width: 56ch;" id="editHint"></p>
+
+                <form id="offerForm" novalidate>
+                    <div class="form-row">
+                        <div class="field">
+                            <label for="cashAmount">Cash amount</label>
+                            <input type="number" id="cashAmount" name="cashAmount"
+                                   min="0" step="1" inputmode="numeric" placeholder="0">
+                        </div>
+                        <div class="field">
+                            <label for="currency">Currency</label>
+                            <select id="currency" name="currency">
+                                <option value="INR">INR — Indian rupee</option>
+                                <option value="USD">USD — US dollar</option>
+                                <option value="EUR">EUR — Euro</option>
+                                <option value="GBP">GBP — Pound sterling</option>
+                                <option value="AED">AED — UAE dirham</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="field">
+                            <label for="productQty">Product units</label>
+                            <input type="number" id="productQty" name="productQty"
+                                   min="1" step="1" inputmode="numeric" placeholder="0">
+                        </div>
+                        <div class="field">
+                            <label for="productNotes">Product details</label>
+                            <input type="text" id="productNotes" name="productNotes"
+                                   maxlength="300" placeholder="e.g. 200 tote bags, logo printed">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="activationIdea">Activation idea</label>
+                        <textarea id="activationIdea" name="activationIdea" maxlength="2000"
+                                  placeholder="What you'd actually do at the event."></textarea>
+                    </div>
+
+                    <div class="field">
+                        <label for="promotionPlan">Promotion plan</label>
+                        <textarea id="promotionPlan" name="promotionPlan" maxlength="2000"
+                                  placeholder="How you'll promote it — social, email, on-site."></textarea>
+                    </div>
+
+                    <div class="field">
+                        <label for="deliverables">Deliverables</label>
+                        <textarea id="deliverables" name="deliverables" maxlength="2000"
+                                  placeholder="What each side commits to, and by when."></textarea>
+                    </div>
+
+                    <p class="form-message" id="offerMessage" role="status" aria-live="polite"></p>
+
+                    <div class="btn-row" style="margin-top: var(--s-4);">
+                        <button class="btn btn-primary" type="submit" id="saveButton">Send proposal</button>
+                        <button class="btn btn-ghost" type="button" id="withdrawButton" hidden>Withdraw</button>
+                        <a class="btn btn-quiet" href="proposals.html" id="cancelLink">Cancel</a>
+                    </div>
+                </form>
+            </section>
+
+            <!-- ---------- planner: the decision ---------- -->
+            <section class="profile-card" id="decideCard" hidden>
+                <div class="profile-card-head">
+                    <h2>Your decision</h2>
+                    <span class="status" id="decideStatus">&hellip;</span>
+                </div>
+                <p class="muted" style="font-size: var(--fs-sm); max-width: 56ch;" id="decideHint"></p>
+
+                <div class="field" id="noteField">
+                    <label for="plannerNoteInput" id="noteLabel">Note to the brand</label>
+                    <textarea id="plannerNoteInput" name="plannerNote" maxlength="2000"
+                              placeholder="Required when asking for changes or declining."></textarea>
+                </div>
+
+                <p class="form-message" id="decideMessage" role="status" aria-live="polite"></p>
+
+                <div class="btn-row" style="margin-top: var(--s-4);">
+                    <button class="btn btn-primary" type="button" id="acceptButton">Accept proposal</button>
+                    <button class="btn btn-ghost" type="button" id="changesButton">Request changes</button>
+                    <button class="btn btn-danger" type="button" id="rejectButton">Decline</button>
+                </div>
+            </section>
+
+            <!-- ---------- read-only footer for a settled proposal ---------- -->
+            <section class="profile-card" id="settledCard" hidden>
+                <div class="profile-card-head">
+                    <h2 id="settledHeading">Settled</h2>
+                </div>
+                <p class="muted" style="font-size: var(--fs-sm); max-width: 56ch;" id="settledBody"></p>
+                <div class="btn-row" id="settledActions"></div>
+            </section>
+
+        </div>
+
+    </main>
+</div>
+
+<script src="../js/script.js"></script>
+
+<!-- SUPABASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/auth-guard.js"></script>
+
+<!-- PROPOSAL DETAIL LOGIC -->
+<script>
+
+    const db = window.supabaseClient;
+
+    let me = null;          // the signed-in profile row
+    let proposal = null;    // the proposals row, or null in create mode
+    let connection = null;  // the connection this proposal hangs off
+    let busy = false;       // blocks a second submit while one is in flight
+
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
+    function showFatal(title, body) {
+        document.getElementById("fatalTitle").textContent = title;
+        document.getElementById("fatalBody").textContent = body;
+        document.getElementById("fatalSection").hidden = false;
+        ["termsCard", "noteCard", "editCard", "decideCard", "settledCard"].forEach(function (id) {
+            document.getElementById(id).hidden = true;
+        });
+    }
+
+    function say(elId, text, isError) {
+        setFormMessage(document.getElementById(elId), text, isError);
+    }
+
+    function hush(elId) {
+        hideFormMessage(document.getElementById(elId));
+    }
+
+    function isPlanner() {
+        return !!me && me.role === "event_planner";
+    }
+
+    function otherParty(row) {
+        if (!me || !row) return null;
+        if (row.brand_id && row.brand_id.id === me.id) return row.planner_id;
+        return row.brand_id;
+    }
+
+    function partyName(party) {
+        if (!party) return "LinkUp member";
+        var name = (party.name || "").trim();
+        return name || "LinkUp member";
+    }
+
+    // PostgREST hands a NUMERIC back as a JSON value that may be a
+    // string depending on the column, so everything goes through String()
+    // before it is parsed. Empty string means "not offered".
+    function numberOrNull(value) {
+        var text = (value === null || value === undefined) ? "" : String(value).trim();
+        if (text === "") return null;
+        var n = Number(text);
+        return isNaN(n) ? null : n;
+    }
+
+    function textOrNull(value) {
+        if (typeof value !== "string") return null;
+        var trimmed = value.trim();
+        return trimmed === "" ? null : trimmed;
+    }
+
+    // The database has proposals_not_empty: no cash and no product is
+    // not an offer. Checking here means the user gets a sentence
+    // instead of a CHECK-constraint violation from the server.
+    function readOffer() {
+        var cash = numberOrNull(document.getElementById("cashAmount").value);
+        var qty = numberOrNull(document.getElementById("productQty").value);
+        var currency = document.getElementById("currency").value || "INR";
+
+        if (cash !== null && cash < 0) {
+            return { error: "The cash amount cannot be negative." };
+        }
+        if (qty !== null && (qty < 1 || qty % 1 !== 0)) {
+            return { error: "Product units must be a whole number of 1 or more." };
+        }
+        if (cash === null && qty === null) {
+            return { error: "Add a cash amount, a number of product units, or both — a proposal needs something in it." };
+        }
+
+        return {
+            value: {
+                cash_amount: cash,
+                currency: currency,
+                product_qty: qty,
+                product_notes: textOrNull(document.getElementById("productNotes").value),
+                activation_idea: textOrNull(document.getElementById("activationIdea").value),
+                promotion_plan: textOrNull(document.getElementById("promotionPlan").value),
+                deliverables: textOrNull(document.getElementById("deliverables").value)
+            }
+        };
+    }
+
+    function fillOfferForm(row) {
+        document.getElementById("cashAmount").value =
+            row.cash_amount === null || row.cash_amount === undefined ? "" : String(row.cash_amount);
+        document.getElementById("productQty").value =
+            row.product_qty === null || row.product_qty === undefined ? "" : String(row.product_qty);
+        document.getElementById("productNotes").value = row.product_notes || "";
+        document.getElementById("activationIdea").value = row.activation_idea || "";
+        document.getElementById("promotionPlan").value = row.promotion_plan || "";
+        document.getElementById("deliverables").value = row.deliverables || "";
+
+        // A currency the <select> does not offer still has to display,
+        // or saving the form would silently rewrite it to INR.
+        var select = document.getElementById("currency");
+        var code = (row.currency || "INR").toUpperCase();
+        var known = Array.prototype.some.call(select.options, function (opt) {
+            return opt.value === code;
+        });
+        if (!known) {
+            var extra = document.createElement("option");
+            extra.value = code;
+            extra.textContent = code;
+            select.appendChild(extra);
+        }
+        select.value = code;
+    }
+
+    // Turn every action off while a write is in flight, and back on
+    // afterwards. Without this a double-click sends two updates.
+    function setBusy(next) {
+        busy = next;
+        ["saveButton", "withdrawButton", "acceptButton", "changesButton", "rejectButton"]
+            .forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.disabled = next;
+            });
+    }
+
+    // ------------------------------------------------------------
+    // Read-only rendering of the terms
+    // ------------------------------------------------------------
+
+    function renderTerms(row, oppTitle) {
+        document.getElementById("rowOpportunity").textContent = oppTitle || "Partnership proposal";
+        document.getElementById("partyLabel").textContent = isPlanner() ? "Brand" : "Planner";
+        document.getElementById("rowParty").textContent = partyName(otherParty(row));
+
+        var money = formatMoney(row.cash_amount, row.currency);
+        document.getElementById("rowCash").textContent = money || "No cash component";
+
+        document.getElementById("rowProduct").textContent =
+            row.product_qty === null || row.product_qty === undefined
+                ? (row.product_notes || "No product component")
+                : plural(row.product_qty, "unit") + (row.product_notes ? " — " + row.product_notes : "");
+
+        document.getElementById("rowActivation").textContent =
+            row.activation_idea || "Not specified yet.";
+        document.getElementById("rowPromotion").textContent =
+            row.promotion_plan || "Not specified yet.";
+        document.getElementById("rowDeliverables").textContent =
+            row.deliverables || "Not specified yet.";
+        document.getElementById("rowUpdated").textContent =
+            formatDateTime(row.updated_at || row.created_at);
+
+        var chip = proposalStatusChip(row.status);
+        var target = document.getElementById("proposalStatus");
+        target.className = chip.className;
+        target.textContent = chip.textContent;
+
+        document.getElementById("termsCard").hidden = false;
+
+        if (row.planner_note) {
+            document.getElementById("plannerNote").textContent = row.planner_note;
+            document.getElementById("noteCard").hidden = false;
+        } else {
+            document.getElementById("noteCard").hidden = true;
+        }
+    }
+
+    // ------------------------------------------------------------
+    // Which panel the current viewer gets
+    // ------------------------------------------------------------
+
+    function renderActions(row) {
+        var status = row.status;
+
+        // Exactly one of the three panels is ever visible. Resetting all
+        // three first is what stops a stale "Settled" card from surviving
+        // a re-render.
+        document.getElementById("editCard").hidden = true;
+        document.getElementById("decideCard").hidden = true;
+        document.getElementById("settledCard").hidden = true;
+        document.getElementById("settledActions").textContent = "";
+
+        if (isPlanner()) {
+            if (isProposalEditable(status)) {
+                decideCard(row);
+                return;
+            }
+            settled(status === "changes_requested" ? "Waiting on the brand" : proposalStatusLabel(status),
+                status === "changes_requested"
+                    ? "You asked for changes. The brand can revise the offer and send it back to you."
+                    : "This proposal is closed. The terms above are a record of what was offered.",
+                status === "changes_requested" ? null : messageLink(row));
+            return;
+        }
+
+        // Brand.
+        if (isProposalEditable(status)) {
+            editCard(row);
+            return;
+        }
+
+        settled(proposalStatusLabel(status),
+            status === "withdrawn"
+                ? "You withdrew this proposal. The planner can still see what you had offered, and it cannot be reopened."
+                : status === "rejected"
+                    ? "The planner declined this proposal. The terms above are a record of what you offered."
+                    : "This proposal was accepted. The terms above are now the agreement.",
+            status === "accepted" ? messageLink(row) : null);
+    }
+
+    function messageLink(row) {
+        if (!row.connection_id) return null;
+        var link = document.createElement("a");
+        link.className = "btn btn-ghost btn-sm";
+        link.href = "messages.html?connection=" + encodeURIComponent(row.connection_id);
+        link.textContent = "Message";
+        return link;
+    }
+
+    function settled(heading, body, action) {
+        document.getElementById("settledHeading").textContent = heading;
+        document.getElementById("settledBody").textContent = body;
+        if (action) document.getElementById("settledActions").appendChild(action);
+    }
+
+    function editCard(row) {
+        var card = document.getElementById("editCard");
+        card.hidden = false;
+
+        var save = document.getElementById("saveButton");
+        var withdraw = document.getElementById("withdrawButton");
+        var cancel = document.getElementById("cancelLink");
+
+        if (row.status === "changes_requested") {
+            document.getElementById("editHeading").textContent = "Revise your offer";
+            document.getElementById("editHint").textContent =
+                "The planner asked for changes. Adjust the terms and send it back for review.";
+            save.textContent = "Resubmit for review";
+        } else {
+            document.getElementById("editHeading").textContent = "Your offer";
+            document.getElementById("editHint").textContent =
+                "You can adjust these terms until the planner responds.";
+            save.textContent = "Save changes";
+        }
+
+        // Nothing to cancel out of on a brand's first send: there is no
+        // proposal yet, so "Cancel" would be a lie.
+        cancel.hidden = !proposal;
+
+        withdraw.hidden = false;
+
+        fillOfferForm(row);
+    }
+
+    function decideCard(row) {
+        var card = document.getElementById("decideCard");
+        card.hidden = false;
+
+        var chip = proposalStatusChip(row.status);
+        var target = document.getElementById("decideStatus");
+        target.className = chip.className;
+        target.textContent = chip.textContent;
+
+        document.getElementById("decideHint").textContent = row.status === "proposed"
+            ? "Accept it as it stands, ask the brand to change something, or decline."
+            : "The brand is revising this after your changes request. Nothing to do until they send it back.";
+
+        var waiting = row.status !== "proposed";
+        ["acceptButton", "changesButton", "rejectButton"].forEach(function (id) {
+            document.getElementById(id).hidden = waiting;
+        });
+        document.getElementById("noteField").hidden = !waiting;
+
+        if (row.planner_note) {
+            document.getElementById("plannerNoteInput").value = row.planner_note;
+        } else {
+            document.getElementById("plannerNoteInput").value = "";
+        }
+    }
+
+    // ------------------------------------------------------------
+    // Writes
+    // ------------------------------------------------------------
+
+    function explainWriteError(err, fallback) {
+        if (!err) return fallback;
+
+        // 23505 on proposals_connection_id_key: a proposal already
+        // exists for this connection. Almost always a double-click or a
+        // second tab, and it is not the user's fault.
+        if (err.code === "23505") {
+            return "A proposal already exists for this connection. Open it from your proposals list.";
+        }
+        // 42501 = RLS refused. The UI should make this unreachable, so
+        // say so plainly instead of echoing a policy name.
+        if (err.code === "42501") {
+            return "The database would not allow that change. Reload the page and try again.";
+        }
+        return fallback + " " + getErrorMessage(err);
+    }
+
+    async function createProposal(offer) {
+        hush("offerMessage");
+
+        // connection.to_user is an embedded profile object, not a uuid.
+        // Writing it straight into a uuid column would fail at the
+        // database with a type error instead of creating the proposal.
+        var plannerId = (connection.to_user && typeof connection.to_user === "object")
+            ? connection.to_user.id
+            : connection.to_user;
+
+        var attempt = await db
+            .from("proposals")
+            .insert({
+                connection_id: connection.id,
+                brand_id: me.id,
+                planner_id: plannerId,
+                status: "proposed",
+                cash_amount: offer.cash_amount,
+                currency: offer.currency,
+                product_qty: offer.product_qty,
+                product_notes: offer.product_notes,
+                activation_idea: offer.activation_idea,
+                promotion_plan: offer.promotion_plan,
+                deliverables: offer.deliverables
+            })
+            .select("*, brand_id(*), planner_id(*), connections(id, opportunity_id)")
+            .single();
+
+        if (attempt.error) {
+            say("offerMessage", explainWriteError(attempt.error, "Could not send the proposal."), true);
+            setBusy(false);
+            return;
+        }
+
+        // No error and no row would mean the server accepted the write
+        // but did not return it. Navigating on a null id would land on
+        // proposal.html?id=undefined, so stop and say so instead.
+        if (!attempt.data) {
+            say("offerMessage",
+                "The proposal was sent but the server did not return it. " +
+                "Check your proposals list before sending another.", true);
+            setBusy(false);
+            return;
+        }
+
+        window.location.href = "proposal.html?id=" + encodeURIComponent(attempt.data.id);
+    }
+
+    async function saveProposal(offer) {
+        hush("offerMessage");
+
+        // Always 'proposed': from 'changes_requested' this is the
+        // resubmission that puts it back in the planner's queue, and
+        // from 'proposed' the status is unchanged and the trigger
+        // short-circuits on NEW.status = OLD.status.
+        var attempt = await db
+            .from("proposals")
+            .update({
+                cash_amount: offer.cash_amount,
+                currency: offer.currency,
+                product_qty: offer.product_qty,
+                product_notes: offer.product_notes,
+                activation_idea: offer.activation_idea,
+                promotion_plan: offer.promotion_plan,
+                deliverables: offer.deliverables,
+                status: "proposed"
+            })
+            .eq("id", proposal.id);
+
+        if (attempt.error) {
+            say("offerMessage", explainWriteError(attempt.error, "Could not save your changes."), true);
+            setBusy(false);
+            return;
+        }
+
+        window.location.reload();
+    }
+
+    async function withdrawProposal() {
+        hush("offerMessage");
+        setBusy(true);
+
+        var attempt = await db
+            .from("proposals")
+            .update({ status: "withdrawn" })
+            .eq("id", proposal.id);
+
+        if (attempt.error) {
+            say("offerMessage", explainWriteError(attempt.error, "Could not withdraw the proposal."), true);
+            setBusy(false);
+            return;
+        }
+
+        window.location.reload();
+    }
+
+    async function decide(status) {
+        hush("decideMessage");
+
+        var note = textOrNull(document.getElementById("plannerNoteInput").value);
+
+        // "Ask for changes" without saying what is not actionable, and
+        // neither is a decline the brand can't learn from.
+        if (status !== "accepted" && !note) {
+            say("decideMessage",
+                status === "changes_requested"
+                    ? "Say what you'd like changed — the brand sees this note."
+                    : "Add a short note so the brand knows why.",
+                true);
+            return;
+        }
+
+        setBusy(true);
+
+        var attempt = await db
+            .from("proposals")
+            .update({ status: status, planner_note: note })
+            .eq("id", proposal.id);
+
+        if (attempt.error) {
+            say("decideMessage", explainWriteError(attempt.error, "Could not record your decision."), true);
+            setBusy(false);
+            return;
+        }
+
+        window.location.reload();
+    }
+
+    // ------------------------------------------------------------
+    // Wiring
+    // ------------------------------------------------------------
+
+    document.getElementById("offerForm").addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (busy) return;
+
+        var read = readOffer();
+        if (read.error) {
+            say("offerMessage", read.error, true);
+            return;
+        }
+
+        setBusy(true);
+        if (proposal) saveProposal(read.value);
+        else createProposal(read.value);
+    });
+
+    document.getElementById("withdrawButton").addEventListener("click", function () {
+        if (busy) return;
+        if (!window.confirm("Withdraw this proposal? The planner can still see what you offered, and it cannot be reopened.")) return;
+        withdrawProposal();
+    });
+
+    document.getElementById("acceptButton").addEventListener("click", function () {
+        if (busy) return;
+        decide("accepted");
+    });
+
+    document.getElementById("changesButton").addEventListener("click", function () {
+        if (busy) return;
+        decide("changes_requested");
+    });
+
+    document.getElementById("rejectButton").addEventListener("click", function () {
+        if (busy) return;
+        decide("rejected");
+    });
+
+    document.getElementById("signOutLink").addEventListener("click", function (event) {
+        event.preventDefault();
+        signOut();
+    });
+
+    // ------------------------------------------------------------
+    // Load
+    // ------------------------------------------------------------
+
+    async function loadOpportunityTitle(id) {
+        if (!id) return null;
+        var result = await db.from("opportunities").select("id, title").eq("id", id).maybeSingle();
+        if (result.error) {
+            // Cosmetic only — the page falls back to a generic title.
+            console.warn("Could not load the opportunity title:", result.error);
+            return null;
+        }
+        return result.data ? result.data.title : null;
+    }
+
+    async function renderProposal() {
+        var auth = await requireSession();
+        if (auth === null) return;
+
+        var profile = auth.profile;
+
+        if (!profile) {
+            showFatal("Your profile could not be loaded",
+                "We could not read your LinkUp profile, so this proposal cannot be shown. " +
+                "Check your connection and reload the page.");
+            console.error("Proposal: profile unavailable", auth.error);
+            return;
+        }
+
+        me = profile;
+
+        var fullName = profile.name ? profile.name.trim() : "";
+        document.getElementById("sidebarAvatar").textContent =
+            getInitials(fullName || "LinkUp User");
+        document.getElementById("sidebarName").textContent = getDisplayName(auth);
+        document.getElementById("sidebarRoleLabel").textContent =
+            isPlanner() ? "Event Planner Account" : "Brand Account";
+
+        var params = new URLSearchParams(window.location.search);
+        var proposalId = params.get("id");
+        var connectionId = params.get("connection");
+
+        if (!proposalId && !connectionId) {
+            showFatal("No proposal selected",
+                "This page needs a proposal id, or a connection id to write a new one. " +
+                "Open one from your proposals list, or from an accepted connection.");
+            return;
+        }
+
+        // ---- create mode: a new proposal on a connection ----
+        if (!proposalId) {
+            await startCreate(connectionId);
+            return;
+        }
+
+        // ---- view mode ----
+        var result = await db
+            .from("proposals")
+            .select("*, brand_id(*), planner_id(*), connections(id, opportunity_id)")
+            .eq("id", proposalId)
+            .maybeSingle();
+
+        if (result.error) {
+            if (isMissingTable(result.error)) {
+                showFatal("Proposals are not set up on this database yet",
+                    "The proposals table is missing. Run supabase-migrations.sql in the " +
+                    "Supabase SQL editor, then reload this page.");
+                return;
+            }
+            showFatal("Proposal could not be loaded", getErrorMessage(result.error));
+            console.error("Proposal read failed:", result.error);
+            return;
+        }
+
+        if (!result.data) {
+            showFatal("Proposal not found",
+                "This proposal does not exist, or it belongs to someone else. " +
+                "Only the brand that wrote it and the planner who received it can open it.");
+            return;
+        }
+
+        proposal = result.data;
+        connection = proposal.connections || null;
+
+        var oppId = connection ? connection.opportunity_id : null;
+        var title = await loadOpportunityTitle(oppId);
+
+        document.getElementById("pageTitle").textContent = title || "Proposal";
+        document.getElementById("pageSubtitle").textContent =
+            (isPlanner() ? "From " : "To ") + partyName(otherParty(proposal)) +
+            " · " + proposalStatusLabel(proposal.status);
+
+        renderTerms(proposal, title);
+        renderActions(proposal);
+    }
+
+    async function startCreate(connectionId) {
+        // A planner has no proposal to write. Saying so beats rendering
+        // a form whose every submit the database would refuse.
+        if (isPlanner()) {
+            showFatal("Proposals are written by the brand",
+                "A planner receives and answers proposals; the brand puts the offer together. " +
+                "Open an incoming proposal from your list instead.");
+            return;
+        }
+
+        var result = await db
+            .from("connections")
+            .select("*, from_user(*), to_user(*), opportunity_id(*)")
+            .eq("id", connectionId)
+            .maybeSingle();
+
+        if (result.error) {
+            if (isMissingTable(result.error)) {
+                showFatal("Proposals are not set up on this database yet",
+                    "The proposals table is missing. Run supabase-migrations.sql in the " +
+                    "Supabase SQL editor, then reload this page.");
+                return;
+            }
+            showFatal("Connection could not be loaded", getErrorMessage(result.error));
+            console.error("Connection read failed:", result.error);
+            return;
+        }
+
+        if (!result.data) {
+            showFatal("Connection not found",
+                "This connection does not exist, or it is not one of yours.");
+            return;
+        }
+
+        var conn = result.data;
+
+        // from_user / to_user arrive as embedded objects because of the
+        // select above, but fall back to the raw uuid if an embed ever
+        // fails to resolve — comparing the object itself to an id would
+        // refuse every legitimate connection.
+        function idOf(value) {
+            if (value && typeof value === "object") return value.id;
+            return value;
+        }
+
+        // The database checks all of this again on insert. Failing here
+        // with a sentence is just a better experience than failing there
+        // with a policy name.
+        if (idOf(conn.from_user) !== me.id) {
+            showFatal("This is not your connection",
+                "Only the brand who sent the interest can write the proposal for it.");
+            return;
+        }
+        if (conn.status !== "accepted") {
+            showFatal("Not accepted yet",
+                "A proposal can only be written once the planner has accepted your interest. " +
+                "You'll find it here as soon as they do.");
+            return;
+        }
+
+        connection = conn;
+
+        // One proposal per connection is a UNIQUE constraint in the
+        // database. Checking here means a brand who follows a stale
+        // "Make a proposal" link lands on their existing proposal
+        // instead of being shown a duplicate-constraint error.
+        var existing = await db
+            .from("proposals")
+            .select("id")
+            .eq("connection_id", conn.id)
+            .maybeSingle();
+
+        if (existing.error && !isMissingTable(existing.error)) {
+            showFatal("Proposal could not be loaded", getErrorMessage(existing.error));
+            console.error("Proposal lookup failed:", existing.error);
+            return;
+        }
+
+        if (existing.data && existing.data.id) {
+            window.location.replace("proposal.html?id=" + encodeURIComponent(existing.data.id));
+            return;
+        }
+
+        var oppTitle = conn.opportunity_id ? conn.opportunity_id.title : null;
+
+        document.getElementById("pageTitle").textContent = "New proposal";
+        document.getElementById("pageSubtitle").textContent =
+            "To " + partyName(conn.to_user) + (oppTitle ? " · " + oppTitle : "");
+
+        // Reuse the read-only terms panel as a live preview of what has
+        // been typed so far, rather than writing a second renderer. The
+        // row is shaped like a real one so renderTerms has a contract to
+        // hold to, with every value empty.
+        renderTerms({
+            brand_id: { id: me.id, name: me.name },
+            planner_id: conn.to_user,
+            cash_amount: null,
+            currency: "INR",
+            product_qty: null,
+            product_notes: null,
+            activation_idea: null,
+            promotion_plan: null,
+            deliverables: null,
+            status: "proposed",
+            planner_note: null,
+            updated_at: null,
+            created_at: null
+        }, oppTitle);
+
+        // That row does not exist yet, so the parts of the panel that
+        // describe an existing proposal have to be corrected.
+        document.getElementById("noteCard").hidden = true;
+        document.getElementById("proposalStatus").textContent = "Not sent yet";
+        document.getElementById("proposalStatus").className = "status status--pending";
+        document.getElementById("rowUpdated").textContent = "—";
+
+        document.getElementById("editCard").hidden = false;
+        document.getElementById("editHeading").textContent = "Your offer";
+        document.getElementById("editHint").textContent =
+            "Set out what you're offering and what you want in return. The planner can accept, " +
+            "ask for changes, or decline.";
+        document.getElementById("saveButton").textContent = "Send proposal";
+        document.getElementById("withdrawButton").hidden = true;
+        document.getElementById("cancelLink").hidden = true;
+        document.getElementById("settledCard").hidden = true;
+
+        fillOfferForm({ currency: "INR" });
+    }
+
+    watchSessionExpiry();
+
+    renderProposal().catch(function (error) {
+        console.error("Proposal failed to load:", error);
+    });
+
+</script>
+</body>
+</html>

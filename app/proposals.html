@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="theme-color" content="#FFEFB3">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposals | LinkUp</title>
+    <script>document.documentElement.classList.add("js");</script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Leckerli+One&display=swap">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="app dashboard">
+
+    <aside class="sidebar">
+        <a href="dashboard.html" class="logo dashboard-logo">Link<em>Up</em></a>
+
+        <div class="sidebar-nav">
+            <div class="nav-title">Platform</div>
+            <nav class="dashboard-nav" aria-label="Platform">
+                <a href="dashboard.html"><span class="nav-icon">01</span><span>Dashboard</span></a>
+                <a href="discover.html"><span class="nav-icon">02</span><span>Discover Events</span></a>
+                <a href="opportunities.html"><span class="nav-icon">03</span><span>Opportunities</span></a>
+                <a href="connections.html"><span class="nav-icon">04</span><span>Connections</span></a>
+                <a href="messages.html"><span class="nav-icon">05</span><span>Messages</span></a>
+                <a href="proposals.html" class="active" aria-current="page"><span class="nav-icon">06</span><span>Proposals</span></a>
+            </nav>
+            <div class="nav-title">Account</div>
+            <nav class="dashboard-nav" aria-label="Account">
+                <a href="profile.html"><span class="nav-icon">07</span><span>Profile</span></a>
+                <a href="../auth/login.html" id="signOutLink"><span class="nav-icon">08</span><span>Sign out</span></a>
+            </nav>
+        </div>
+
+        <div class="sidebar-bottom">
+            <a href="profile.html" class="sidebar-profile">
+                <div class="profile-avatar" id="sidebarAvatar">…</div>
+                <div class="sidebar-profile-text">
+                    <strong id="sidebarName">Loading…</strong>
+                    <span id="sidebarRoleLabel">…</span>
+                </div>
+            </a>
+        </div>
+    </aside>
+
+    <main class="dashboard-main">
+
+        <header class="topbar">
+            <div class="page-title">
+                <h1>Proposals</h1>
+                <p id="proposalsDescription">What each side is putting on the table.</p>
+            </div>
+        </header>
+
+        <!-- Shown instead of the list when the database has no proposals
+             table yet, or when the read is rejected. -->
+        <section class="dash-section" id="fatalSection" hidden>
+            <div class="empty-note">
+                <h3 id="fatalTitle">Proposals are not available yet</h3>
+                <p id="fatalBody"></p>
+                <div class="btn-row">
+                    <a class="btn btn-ghost" href="connections.html">Back to Connections</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="dash-section welcome-card" id="listSection" hidden>
+
+            <div class="section-header">
+                <h2 id="listHeading">Your proposals</h2>
+                <div class="section-header-meta">
+                    <span class="stamp" id="proposalCount">Loading…</span>
+                </div>
+            </div>
+
+            <p class="muted" style="font-size: var(--fs-sm);" id="listHint"></p>
+
+            <div class="btn-row" id="filterRow" style="margin-top: var(--s-4);">
+                <button class="btn btn-ghost btn-sm" type="button" data-filter="all">All</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-filter="live">Needs you</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-filter="closed">Closed</button>
+            </div>
+
+            <div class="connection-list" id="proposalList" style="margin-top: var(--s-5);"></div>
+
+            <div class="empty-note" id="proposalEmpty" hidden>
+                <h3 id="emptyTitle">No proposals yet</h3>
+                <p id="emptyBody"></p>
+                <div class="btn-row" id="emptyActions"></div>
+            </div>
+
+        </section>
+
+    </main>
+</div>
+
+<script src="../js/script.js"></script>
+
+<!-- SUPABASE SDK + SHARED CONFIG + AUTH GUARD (load in this order) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/auth-guard.js"></script>
+
+<!-- PROPOSALS LIST LOGIC -->
+<script>
+
+    const db = window.supabaseClient;
+
+    let me = null;          // the signed-in profile row
+    let rows = [];          // every proposal the signed-in user is a party to
+    let filter = "all";     // all | live | closed
+
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
+    function showFatal(title, body) {
+        document.getElementById("fatalTitle").textContent = title;
+        document.getElementById("fatalBody").textContent = body;
+        document.getElementById("fatalSection").hidden = false;
+        document.getElementById("listSection").hidden = true;
+    }
+
+    function isPlanner() {
+        return !!me && me.role === "event_planner";
+    }
+
+    // The proposal partner, from the signed-in user's point of view.
+    // The embedded brand_id / planner_id objects can arrive null if RLS
+    // hides that profile, so this has to cope with a missing object.
+    function otherParty(row) {
+        if (!me) return null;
+        if (row.brand_id && row.brand_id.id === me.id) return row.planner_id;
+        return row.brand_id;
+    }
+
+    function partyName(party) {
+        if (!party) return "LinkUp member";
+        var name = (party.name || "").trim();
+        return name || "LinkUp member";
+    }
+
+    // The opportunity the proposal grew out of, when the connection has
+    // one. Generic connections have a null opportunity_id.
+    function opportunityTitle(row) {
+        var opp = row.opportunities;
+        if (opp && opp.title) return opp.title;
+        return "Partnership proposal";
+    }
+
+    // "Cash + product", "Cash", "Product" — what is actually on the
+    // table. Never guesses: it only names the fields that have a value.
+    function offerSummary(row) {
+        var parts = [];
+
+        var money = formatMoney(row.cash_amount, row.currency);
+        if (money) parts.push(money);
+
+        if (row.product_qty !== null && row.product_qty !== undefined) {
+            parts.push(plural(row.product_qty, "product unit"));
+        }
+
+        if (!parts.length) return "Nothing specified";
+        return parts.join(" + ");
+    }
+
+    // A proposal needs a brand to write it, on a connection the planner
+    // has already accepted. This is the one place that has to be said
+    // out loud, because the empty state is otherwise a dead end.
+    function emptyState() {
+        var title = document.getElementById("emptyTitle");
+        var body = document.getElementById("emptyBody");
+        var actions = document.getElementById("emptyActions");
+        actions.textContent = "";
+
+        if (filter === "live") {
+            title.textContent = "Nothing waiting on you";
+            body.textContent = isPlanner()
+                ? "No proposal is currently awaiting your review."
+                : "You have no proposal the planner is waiting on.";
+            return;
+        }
+
+        if (filter === "closed") {
+            title.textContent = "Nothing closed yet";
+            body.textContent = "Accepted, declined and withdrawn proposals will collect here.";
+            return;
+        }
+
+        if (isPlanner()) {
+            title.textContent = "No proposals yet";
+            body.textContent = "When a brand you've connected with puts an offer together, " +
+                "it arrives here for you to accept, decline, or ask for changes.";
+            return;
+        }
+
+        title.textContent = "No proposals yet";
+        body.textContent = "A proposal is the actual offer: what you'll give, what you want, " +
+            "and how you'll promote it. Open one of your accepted connections to write your first.";
+
+        var link = document.createElement("a");
+        link.className = "btn btn-ghost btn-sm";
+        link.href = "connections.html";
+        link.textContent = "Go to Connections";
+        actions.appendChild(link);
+    }
+
+    // ------------------------------------------------------------
+    // Rendering
+    // ------------------------------------------------------------
+
+    function visibleRows() {
+        if (filter === "live") {
+            return rows.filter(function (r) { return isProposalEditable(r.status); });
+        }
+        if (filter === "closed") {
+            return rows.filter(function (r) { return isProposalFinal(r.status); });
+        }
+        return rows;
+    }
+
+    function renderList() {
+        var list = document.getElementById("proposalList");
+        var empty = document.getElementById("proposalEmpty");
+        var count = document.getElementById("proposalCount");
+        var shown = visibleRows();
+
+        list.textContent = "";
+
+        document.getElementById("proposalCount").textContent =
+            plural(shown.length, "proposal");
+
+        if (!shown.length) {
+            empty.hidden = false;
+            emptyState();
+            return;
+        }
+
+        empty.hidden = true;
+
+        shown.forEach(function (row) {
+            var partner = otherParty(row);
+
+            var card = document.createElement("article");
+            card.className = "profile-card";
+            card.setAttribute("data-reveal", "");
+
+            var head = document.createElement("div");
+            head.className = "profile-card-head";
+
+            var title = document.createElement("h3");
+            title.textContent = opportunityTitle(row);
+            head.appendChild(title);
+            head.appendChild(proposalStatusChip(row.status));
+            card.appendChild(head);
+
+            var meta = document.createElement("p");
+            meta.className = "muted";
+            meta.textContent = (isPlanner() ? "From " : "To ") + partyName(partner) +
+                " · " + offerSummary(row);
+            card.appendChild(meta);
+
+            var when = document.createElement("p");
+            when.className = "muted";
+            when.textContent = "Updated " + formatDate(row.updated_at || row.created_at);
+            card.appendChild(when);
+
+            if (row.status === "changes_requested" && row.planner_note) {
+                var note = document.createElement("p");
+                note.className = "muted";
+                note.textContent = "“" + row.planner_note + "”";
+                card.appendChild(note);
+            }
+
+            var actions = document.createElement("div");
+            actions.className = "btn-row";
+
+            var open = document.createElement("a");
+            open.className = "btn btn-ghost btn-sm";
+            open.href = "proposal.html?id=" + encodeURIComponent(row.id);
+            open.textContent = row.status === "proposed" && isPlanner() ? "Review" : "Open";
+            actions.appendChild(open);
+
+            card.appendChild(actions);
+            list.appendChild(card);
+        });
+    }
+
+    function applyFilter(next) {
+        filter = next;
+
+        // Mark the active chip. Using aria-pressed rather than a class
+        // swap keeps it announced.
+        document.querySelectorAll("#filterRow [data-filter]").forEach(function (btn) {
+            btn.setAttribute("aria-pressed", btn.getAttribute("data-filter") === filter ? "true" : "false");
+        });
+
+        renderList();
+    }
+
+    function wireFilters() {
+        document.querySelectorAll("#filterRow [data-filter]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                applyFilter(btn.getAttribute("data-filter"));
+            });
+        });
+        applyFilter(filter);
+    }
+
+    // ------------------------------------------------------------
+    // Load
+    // ------------------------------------------------------------
+
+    async function renderProposals() {
+        var auth = await requireSession();
+        if (auth === null) return;
+
+        var profile = auth.profile;
+
+        if (!profile) {
+            showFatal(
+                "Your profile could not be loaded",
+                "We could not read your LinkUp profile, so there is nothing to show. " +
+                "Check your connection and reload the page."
+            );
+            console.error("Proposals: profile unavailable", auth.error);
+            return;
+        }
+
+        me = profile;
+
+        var fullName = profile.name ? profile.name.trim() : "";
+        document.getElementById("sidebarAvatar").textContent =
+            getInitials(fullName || "LinkUp User");
+        document.getElementById("sidebarName").textContent = getDisplayName(auth);
+        document.getElementById("sidebarRoleLabel").textContent =
+            isPlanner() ? "Event Planner Account" : "Brand Account";
+
+        document.getElementById("listHeading").textContent =
+            isPlanner() ? "Proposals received" : "Proposals you've sent";
+        document.getElementById("listHint").textContent = isPlanner()
+            ? "Offers from brands you're connected with. Open one to accept it, decline it, or ask for changes."
+            : "Offers you've put to planners. Open one to revise the terms or withdraw it.";
+
+        var column = isPlanner() ? "planner_id" : "brand_id";
+
+        try {
+            var result = await db
+                .from("proposals")
+                .select("*, brand_id(*), planner_id(*), connections(id, opportunity_id)")
+                .eq(column, me.id)
+                .order("updated_at", { ascending: false });
+
+            if (result.error) throw result.error;
+
+            rows = result.data || [];
+
+            // PostgREST cannot join a second hop (proposals ->
+            // connections -> opportunities), so the opportunity title is
+            // stitched on from a second read. One extra query, and only
+            // when there is something to look up.
+            await attachOpportunityTitles();
+
+            document.getElementById("listSection").hidden = false;
+            wireFilters();
+        } catch (err) {
+            if (isMissingTable(err)) {
+                showFatal(
+                    "Proposals are not set up on this database yet",
+                    "The proposals table is missing. Run supabase-migrations.sql in the " +
+                    "Supabase SQL editor, then reload this page."
+                );
+                return;
+            }
+            showFatal(
+                "Proposals could not be loaded",
+                "The database rejected the request: " + getErrorMessage(err)
+            );
+            console.error("Proposals failed to load:", err);
+        }
+    }
+
+    // Fill in rows[i].opportunities for the proposals that hang off an
+    // opportunity. A connection with no opportunity_id is a generic
+    // connection and simply keeps the fallback title.
+    async function attachOpportunityTitles() {
+        var ids = rows
+            .map(function (r) {
+                return r.connections && r.connections.opportunity_id
+                    ? r.connections.opportunity_id
+                    : null;
+            })
+            .filter(Boolean);
+
+        var unique = ids.filter(function (id, i) { return ids.indexOf(id) === i; });
+        if (!unique.length) return;
+
+        var result = await db
+            .from("opportunities")
+            .select("id, title")
+            .in("id", unique);
+
+        // A failure here is cosmetic — the list falls back to
+        // "Partnership proposal" — so it must not take the page down.
+        // An empty result is not a failure, so it says nothing.
+        if (result.error) {
+            console.warn("Could not load opportunity titles for proposals:", result.error);
+            return;
+        }
+        if (!result.data) return;
+
+        var titles = {};
+        result.data.forEach(function (opp) { titles[opp.id] = opp.title; });
+
+        rows.forEach(function (r) {
+            var id = r.connections && r.connections.opportunity_id;
+            if (id && titles[id]) r.opportunities = { id: id, title: titles[id] };
+        });
+    }
+
+    document.getElementById("signOutLink").addEventListener("click", function (event) {
+        event.preventDefault();
+        signOut();
+    });
+
+    watchSessionExpiry();
+
+    renderProposals().catch(function (error) {
+        console.error("Proposals failed:", error);
+    });
+
+</script>
+</body>
+</html>

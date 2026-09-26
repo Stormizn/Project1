@@ -121,6 +121,54 @@ for (const f of [...htmls, join(root, 'js/supabase.js'), join(root, 'js/auth-gua
 }
 pass('no service_role in browser-served code');
 
+// ------------------------------------------------------- 5. html tag balance
+// An orphaned </div> or </span> is not a parse error -- the browser
+// silently drops it -- so nothing else here notices. It still means the
+// markup says something other than what was intended, which is how the
+// stray closing tags in legal.html survived. Void elements never get a
+// closing tag, and anything inside <script>/<style> is not markup.
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+  'link', 'meta', 'param', 'source', 'track', 'wbr']);
+
+function tagBalance(html) {
+  const stripped = html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<!doctype[^>]*>/gi, '');
+
+  const stack = [];
+  const problems = [];
+
+  for (const m of stripped.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)\b[^>]*?(\/?)>/g)) {
+    const [, closing, name, selfClose] = m;
+    const tag = name.toLowerCase();
+
+    if (VOID.has(tag) || selfClose === '/') continue;
+
+    if (closing === '/') {
+      const open = stack.pop();
+      if (!open) problems.push(`stray </${tag}>`);
+      else if (open !== tag) problems.push(`</${tag}> closes <${open}>`);
+    } else {
+      stack.push(tag);
+    }
+  }
+
+  for (const unclosed of stack) problems.push(`<${unclosed}> never closed`);
+  return problems;
+}
+
+let balanceChecked = 0;
+for (const f of htmls) {
+  const html = readFileSync(f, 'utf8');
+  const problems = tagBalance(html);
+  balanceChecked++;
+  problems.length
+    ? fail(`${basename(f)} html tags: ${problems.slice(0, 4).join('; ')}`)
+    : pass(`${basename(f)}: tags balanced`);
+}
+
 function exists(p) { try { statSync(p); return true; } catch { return false; } }
 
 console.log(

@@ -27,7 +27,7 @@
                 <a href="opportunities.html"><span class="nav-icon">03</span><span>Opportunities</span></a>
                 <a href="connections.html" class="active" aria-current="page"><span class="nav-icon">04</span><span>Connections</span></a>
                 <a href="messages.html"><span class="nav-icon">05</span><span>Messages</span></a>
-                <a href="partnerships.html"><span class="nav-icon">06</span><span>Partnerships</span></a>
+                <a href="proposals.html"><span class="nav-icon">06</span><span>Proposals</span></a>
             </nav>
             <div class="nav-title">Account</div>
             <nav class="dashboard-nav" aria-label="Account">
@@ -193,6 +193,13 @@
                 // Messages are keyed to a connection and the INSERT
                 // policy requires status = 'accepted', so this is the
                 // only state where the thread can actually be used.
+                //
+                // No proposal link here. `renderPlannerView` is the
+                // planner's side, and only a brand writes a proposal --
+                // `conn.from_user` is the brand that sent the interest,
+                // so it is populated on every row and cannot be used to
+                // tell the two sides apart. The planner reaches their
+                // proposals from the sidebar.
                 const actions = document.createElement("div");
                 actions.className = "btn-row";
 
@@ -263,6 +270,12 @@
                 message.href = "messages.html?connection=" + encodeURIComponent(conn.id);
                 message.textContent = "Message";
                 actions.appendChild(message);
+
+                const propose = document.createElement("a");
+                propose.className = "btn btn-primary btn-sm";
+                propose.href = "proposal.html?connection=" + encodeURIComponent(conn.id);
+                propose.textContent = "Make a proposal";
+                actions.appendChild(propose);
 
                 row.appendChild(actions);
             }
