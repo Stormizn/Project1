@@ -90,3 +90,10 @@ md/ROADMAP.md
 ROADMAP.md
 
 # NOTE: md/README.md stays TRACKED so it ships.
+#
+# AGENTS.md is deliberately NOT ignored. It is committed project
+# documentation -- it is how anyone (or any agent) picking this repo up
+# learns that .gitignore and .vercelignore are different jobs, and that
+# the two SQL files must be edited in pairs. An ignore entry for it
+# would be dead config anyway: gitignore has no effect on a file that
+# is already tracked.

@@ -448,6 +448,16 @@ CREATE POLICY "Senders can delete their own messages"
 -- create objects in a schema on that path can shadow a name used inside
 -- the function body and run code as the owner. Every reference below is
 -- schema-qualified instead.
+--
+-- ONE THING THAT LOOKS WRONG BUT IS NOT: this function deletes from
+-- public.proposals, and the proposals table is not created until section
+-- 4, further down this same file. That is safe only because plpgsql stores
+-- the body as source text and does not resolve table references until the
+-- function first runs -- so the CREATE succeeds. Do not "fix" it by
+-- reordering, and do not be surprised if a paste fails between here and
+-- section 4: delete_account() will then exist and be reachable from the
+-- Profile page, and calling it raises "relation public.proposals does not
+-- exist". Re-run the whole file to finish applying it.
 
 CREATE OR REPLACE FUNCTION public.delete_account()
 RETURNS void
@@ -508,6 +518,10 @@ GRANT EXECUTE ON FUNCTION public.delete_account() TO authenticated;
 --
 -- IF NOT EXISTS on purpose, like `messages`: this file is re-runnable,
 -- and a DROP + CREATE would throw away every proposal already made.
+--
+-- This section comes AFTER delete_account() in section 3c, which already
+-- deletes from this table. That is deliberate and safe -- see the note
+-- above delete_account() for why, and do not reorder the two.
 --
 -- The CHECK on status is the state machine's vocabulary. The legal
 -- moves between those values are enforced by proposals_state_guard()
