@@ -181,6 +181,38 @@ for (const f of htmls) {
     : pass(`${basename(f)}: tags balanced`);
 }
 
+// ------------------------------------------- 6. no retired brand in the text
+// Every other check here reads the source. That is not enough for a
+// name: the wordmark is `Link<em>zyfy</em>`, so a grep for the old
+// name finds nothing while the page still renders it. A rename done
+// with find-and-replace silently skips every wordmark whose halves are
+// separated by a tag -- which is all 17 of them, in the nav and the
+// footer of every page. Strip the markup first, then look at the text
+// the browser actually paints.
+const RETIRED = ['linkup'];
+
+function visibleText(html) {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, '');            // the wordmark's split lives here
+}
+
+let brandChecked = 0;
+let brandStale = 0;
+for (const f of htmls) {
+  const text = visibleText(readFileSync(f, 'utf8'));
+  for (const old of RETIRED) {
+    if (new RegExp(old, 'i').test(text)) {
+      brandStale++;
+      fail(`${basename(f)} still shows the old name "${old}"`);
+    }
+  }
+  brandChecked++;
+}
+if (!brandStale) pass(`no retired name in the rendered text of ${brandChecked} pages`);
+
 function exists(p) { try { statSync(p); return true; } catch { return false; } }
 
 console.log(
