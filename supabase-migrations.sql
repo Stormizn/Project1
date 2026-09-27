@@ -1,5 +1,5 @@
 -- =========================================================
--- LINKUP — MIGRATION 001 (existing databases)
+-- LINKZYFY — MIGRATION 001 (existing databases)
 -- =========================================================
 -- Run this in the Supabase SQL Editor for the project that is
 -- ALREADY live (project ref: grqeacirsyyzqbycvssn).
@@ -35,6 +35,14 @@
 --      discussed in messages but never actually put on paper. It is
 --      keyed to a connection for the same reason, and its state
 --      machine is enforced by a trigger rather than by the UI.
+--  12. A brand could forge a planner's consent. `Brands can send
+--      interest` never checked `status`, and the connections UPDATE
+--      policy let either party write any status, so a brand could
+--      create a connection already marked `accepted` — or UPDATE its
+--      own pending row to `accepted`. Since sending a proposal only
+--      requires an accepted connection, that skipped the handshake
+--      entirely. A new connection must now start `pending`, and only
+--      the recipient planner may reach `accepted` / `rejected`.
 -- =========================================================
 
 
@@ -297,13 +305,48 @@ CREATE POLICY "Brands can send interest"
         AND o.organizer_id = to_user
         AND o.status = 'open'
     )
+    -- A new connection always starts pending. Without this a brand
+    -- could INSERT the row already marked `accepted` and skip the
+    -- handshake the whole feature depends on. See the UPDATE policies
+    -- below for the other route to the same place.
+    AND status = 'pending'
   );
 
+-- Who may move a connection to which status.
+--
+-- The old policy was `auth.uid() = from_user OR auth.uid() = to_user`
+-- with no mention of `status`, which meant a brand could UPDATE its
+-- own pending row straight to `accepted`. Since `Brands can send
+-- proposals` only requires that the connection be accepted, that let a
+-- brand manufacture consent and file a proposal the planner had never
+-- agreed to. RLS decides *who* may touch a row; these two policies are
+-- where *which statuses* gets decided, mirroring `proposals`.
+--
+-- RLS cannot compare the new row against the old one, so it cannot stop
+-- a party repointing `from_user` / `opportunity_id` on a row it is
+-- already party to. That is a much smaller problem than forged
+-- consent, and it is noted rather than papered over.
 DROP POLICY IF EXISTS "Users can update their own connections" ON public.connections;
-CREATE POLICY "Users can update their own connections"
+DROP POLICY IF EXISTS "Recipients can respond to interest" ON public.connections;
+DROP POLICY IF EXISTS "Senders can archive their own interest" ON public.connections;
+
+CREATE POLICY "Recipients can respond to interest"
   ON public.connections FOR UPDATE
-  USING (auth.uid() = from_user OR auth.uid() = to_user)
-  WITH CHECK (auth.uid() = from_user OR auth.uid() = to_user);
+  USING (
+    auth.uid() = to_user
+    AND status IN ('pending', 'accepted')
+  )
+  WITH CHECK (
+    auth.uid() = to_user
+    AND status IN ('accepted', 'rejected', 'archived')
+  );
+
+-- A brand may withdraw its own interest, and nothing else. It cannot
+-- reach `accepted` or `rejected`: only the planner's decision does that.
+CREATE POLICY "Senders can archive their own interest"
+  ON public.connections FOR UPDATE
+  USING (auth.uid() = from_user)
+  WITH CHECK (auth.uid() = from_user AND status = 'archived');
 
 DROP POLICY IF EXISTS "Users can delete their own connections" ON public.connections;
 CREATE POLICY "Users can delete their own connections"

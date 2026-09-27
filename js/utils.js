@@ -1,5 +1,5 @@
 // ==========================================
-// LINKUP SHARED UI HELPERS
+// LINKZYFY SHARED UI HELPERS
 // ==========================================
 //
 // Small pure functions that were previously copy-pasted into every
@@ -119,6 +119,26 @@ function formatMoney(amount, currency) {
         // number beats showing nothing.
         return String(value);
     }
+}
+
+// `opportunities.budget` is free text, not a number with a currency
+// column behind it -- a planner may type "50000", "50k" or
+// "Negotiable". `formatMoney` assumes INR, which is correct for
+// proposals because `proposals.currency` really is a column, but
+// applying it blindly here would print "" for anything that is not a
+// bare number. So: a bare number gets the same treatment a proposal
+// amount does, so the two never disagree on screen, and anything else
+// is shown verbatim with no invented symbol.
+function formatBudget(budget) {
+    if (budget === null || budget === undefined) return "";
+
+    var raw = String(budget).trim();
+    if (raw === "") return "";
+
+    var value = Number(raw);
+    if (isNaN(value)) return raw;
+
+    return formatMoney(value, "INR");
 }
 
 // Postgres/PostgREST error codes that mean "this table or column is not

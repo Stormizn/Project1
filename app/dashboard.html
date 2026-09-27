@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="theme-color" content="#FFEFB3">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | LinkUp</title>
+    <title>Dashboard | Linkzyfy</title>
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,7 +52,7 @@
         <header class="topbar">
             <div class="page-title">
                 <h1>Dashboard</h1>
-                <p>Your LinkUp network at a glance.</p>
+                <p>Your Linkzyfy network at a glance.</p>
             </div>
             <div class="topbar-actions">
                 <label class="search-box">
@@ -154,7 +154,7 @@
         // 3. Sidebar profile area
 
         document.getElementById("sidebarAvatar").textContent =
-            getInitials(fullName || "LinkUp User");
+            getInitials(fullName || "Linkzyfy User");
 
         document.getElementById("sidebarName").textContent =
             displayName;
@@ -244,7 +244,7 @@
                 var other = conn.from_user && conn.from_user.id === profile.id
                     ? conn.to_user
                     : conn.from_user;
-                var otherName = (other && other.name ? other.name.trim() : "") || "LinkUp member";
+                var otherName = (other && other.name ? other.name.trim() : "") || "Linkzyfy member";
                 var opp = conn.opportunity_id || null;
                 var oppTitle = opp && opp.title ? opp.title : "Partnership request";
 
@@ -327,7 +327,7 @@
             var type = item.type || "Partnership";
             var title = item.title || "Untitled opportunity";
             var desc = item.description || "No description provided yet.";
-            var budget = item.budget ? "Budget: $" + item.budget : "Budget TBA";
+            var budget = item.budget ? "Budget: " + formatBudget(item.budget) : "Budget TBA";
             var audience = item.audience || "Audience TBA";
 
             var card = document.createElement("article");
@@ -381,7 +381,7 @@
 
         // These cards were just inserted, so they need the scroll-reveal
         // and tilt hooks that were only wired up at page load.
-        if (window.linkupUI) window.linkupUI.enhance(grid);
+        if (window.linkzyfyUI) window.linkzyfyUI.enhance(grid);
     }
 
     async function renderRecommended() {

@@ -1,5 +1,5 @@
 # ==========================================
-# LINKUP — GITIGNORE
+# LINKZYFY — GITIGNORE
 # ==========================================
 #
 # Files listed here are never committed or
@@ -37,7 +37,7 @@ $RECYCLE.BIN/
 # Editor / IDE
 # ------------------------------------------
 # .vscode/launch.json and .vscode/tasks.json are both tracked on
-# purpose: they are the shared "serve + open LinkUp" debug config,
+# purpose: they are the shared "serve + open Linkzyfy" debug config,
 # and launch.json cannot work without the task it references.
 # Only personal VS Code settings stay ignored.
 .vscode/settings.json

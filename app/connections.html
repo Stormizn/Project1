@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="theme-color" content="#FFEFB3">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connections | LinkUp</title>
+    <title>Connections | Linkzyfy</title>
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -317,7 +317,7 @@
         const fullName = profile.name ? profile.name.trim() : "";
         const displayName = getDisplayName(auth);
 
-        document.getElementById("sidebarAvatar").textContent = getInitials(fullName || "LinkUp User");
+        document.getElementById("sidebarAvatar").textContent = getInitials(fullName || "Linkzyfy User");
         document.getElementById("sidebarName").textContent = displayName;
         document.getElementById("sidebarRoleLabel").textContent =
             profile.role === "event_planner" ? "Event Planner Account" : "Brand Account";

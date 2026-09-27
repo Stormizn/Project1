@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="theme-color" content="#FFEFB3">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messages | LinkUp</title>
+    <title>Messages | Linkzyfy</title>
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -159,7 +159,7 @@
     function partyName(party) {
         if (!party) return "Unknown member";
         var name = (party.name || "").trim();
-        return name || "LinkUp member";
+        return name || "Linkzyfy member";
     }
 
     // Today -> "4:32 pm", this year -> "5 Oct", older -> "Oct 2025".
@@ -539,7 +539,7 @@
         me = profile;
 
         const fullName = profile.name ? profile.name.trim() : "";
-        document.getElementById("sidebarAvatar").textContent = getInitials(fullName || "LinkUp User");
+        document.getElementById("sidebarAvatar").textContent = getInitials(fullName || "Linkzyfy User");
         document.getElementById("sidebarName").textContent = getDisplayName(auth);
         document.getElementById("sidebarRoleLabel").textContent =
             profile.role === "event_planner" ? "Event Planner Account" : "Brand Account";

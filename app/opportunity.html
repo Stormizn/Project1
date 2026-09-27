@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="theme-color" content="#FFEFB3">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Opportunity | LinkUp</title>
+    <title>Opportunity | Linkzyfy</title>
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -139,7 +139,7 @@
         const organizer = opp.organizer_id || null;
 
         const organizerLabel =
-            organizer && organizer.name ? organizer.name : "LinkUp event organizer";
+            organizer && organizer.name ? organizer.name : "Linkzyfy event organizer";
         const organizerId =
             organizer && organizer.id ? organizer.id : opp.organizer_id;
 
@@ -153,7 +153,7 @@
 
         document.getElementById("oppType").textContent = opp.type || "—";
         document.getElementById("oppBudget").textContent =
-            opp.budget ? "$" + opp.budget : "Not shared yet";
+            opp.budget ? formatBudget(opp.budget) : "Not shared yet";
         document.getElementById("oppAudience").textContent =
             opp.audience || "Not specified";
         document.getElementById("oppDescription").textContent =
@@ -259,7 +259,7 @@
         const displayName = getDisplayName(auth);
 
         document.getElementById("sidebarAvatar").textContent =
-            getInitials(fullName || "LinkUp User");
+            getInitials(fullName || "Linkzyfy User");
         document.getElementById("sidebarName").textContent =
             displayName;
         document.getElementById("sidebarRoleLabel").textContent =

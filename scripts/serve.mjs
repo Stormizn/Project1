@@ -94,7 +94,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`LinkUp dev server → http://localhost:${PORT}`);
+  console.log(`Linkzyfy dev server → http://localhost:${PORT}`);
   console.log(`serving          ${ROOT}`);
   console.log("press ctrl+c to stop");
 });

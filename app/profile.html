@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="theme-color" content="#FFEFB3">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile | LinkUp</title>
+    <title>Profile | Linkzyfy</title>
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -219,7 +219,7 @@
 
     function fillProfile(profile) {
 
-        const fullName = profile.name || "LinkUp User";
+        const fullName = profile.name || "Linkzyfy User";
 
         document.getElementById("profileAvatar").textContent =
             getInitials(fullName);
@@ -228,7 +228,7 @@
             fullName;
 
         document.getElementById("profileRoleLabel").textContent =
-            getRoleLabel(profile.role) + " · LinkUp";
+            getRoleLabel(profile.role) + " · Linkzyfy";
 
         document.getElementById("profileDisplayFullName").textContent =
             profile.name || "—";

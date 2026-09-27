@@ -1,10 +1,10 @@
-# LinkUp [Vibecoded cuz ts a school proj and i hate my school :D]
+# Linkzyfy [Vibecoded cuz ts a school proj and i hate my school :D]
 
 > **A structured marketplace and network for brand–event partnerships and collaborations.**
 
-LinkUp connects **brands** with **event organizers** (and, eventually, creators, communities and service providers) so both sides can discover each other, connect, propose partnerships, and manage collaborations — instead of hunting for sponsors or events through scattered channels.
+Linkzyfy connects **brands** with **event organizers** (and, eventually, creators, communities and service providers) so both sides can discover each other, connect, propose partnerships, and manage collaborations — instead of hunting for sponsors or events through scattered channels.
 
-## What LinkUp is trying to solve
+## What Linkzyfy is trying to solve
 
 | Side | Needs |
 | --- | --- |
@@ -28,11 +28,12 @@ Discover
   ↓
 Opportunity
   ↓
-Connection
+Connection  (planner accepts or declines)
   ↓
-Proposal      (planned)
+Proposal     (brand offers cash / product on an accepted connection;
+              planner accepts, requests changes, or declines)
   ↓
-Partnership   (planned)
+Partnership  (planned — a tracked record of an accepted proposal)
 ```
 
 ## Tech stack
@@ -44,7 +45,7 @@ Partnership   (planned)
 ## Project structure
 
 ```
-LinkUp/
+Linkzyfy/
 ├── index.html            Landing page (public)
 ├── legal.html            Privacy & Terms (public)
 ├── auth/
@@ -60,7 +61,8 @@ LinkUp/
 │   ├── connections.html  Sent / received interest (accept & decline)
 │   ├── profile.html      Profile page (loads the real logged-in user)
 │   ├── messages.html     Inbox — threads per accepted connection
-│   └── partnerships.html Placeholder (Phase 6)
+│   ├── proposals.html    Proposals sent / received (filterable)
+│   └── proposal.html     Proposal detail (?id=) + the brand's offer form (?connection=)
 ├── css/
 │   └── style.css         Global styles (Butter + Ink design system)
 ├── js/
@@ -70,7 +72,7 @@ LinkUp/
 │   └── utils.js          Shared helpers (error text, dates, status labels)
 ├── scripts/
 │   └── serve.mjs         Zero-dependency local static server
-├── .vscode/              Shared "serve + open LinkUp" debug config
+├── .vscode/              Shared "serve + open Linkzyfy" debug config
 ├── favicon.svg           Site mark
 ├── supabase-schema.sql   Full schema — for a BRAND NEW database
 └── supabase-migrations.sql
@@ -118,11 +120,20 @@ are driven by `script.js` (`data-reveal`, `data-tilt`, `data-parallax`).
       the two people on that connection, requires the connection to be
       accepted before anything can be sent, and a trigger makes the
       message body immutable after sending (only `read_at` can change)
-- ⏳ `partnerships.html` is still a placeholder
+- ✅ Proposals — a brand puts a real offer (cash amount, product quantity,
+      activation idea, promotion plan, deliverables) on an **accepted**
+      connection, and can revise or withdraw it. The planner accepts, declines,
+      or requests changes with a note. The state machine and the rule that only
+      the brand edits the offer live in the database, not the UI
+- ✅ Interest cannot be self-accepted. A connection always starts `pending`, and
+      only the planner who received the request can reach `accepted` / `rejected`,
+      so a brand cannot forge consent and file a proposal the planner never agreed to
 - ⏳ Notifications are not implemented; the bell is shown disabled
+- ⏳ Realtime message delivery is not wired up — reopen a thread to re-read it
 - Account deletion is available on the Profile page and requires explicit
   confirmation (typed `DELETE`). The server-side RPC deletes data in
   dependency order and removes the `auth.users` row. There is no undo.
+
 ## Setting up the database
 
 **Already have a database?** Run [`supabase-migrations.sql`](./supabase-migrations.sql)
@@ -179,7 +190,7 @@ nothing needs installing:
 node scripts/serve.mjs        # http://localhost:8080
 ```
 
-In VS Code you can also just press **F5** and pick "Serve + open LinkUp" — it
+In VS Code you can also just press **F5** and pick "Serve + open Linkzyfy" — it
 starts that same server and opens Chrome for you.
 
 Any other static server works too (e.g. VS Code Live Server). The exact same

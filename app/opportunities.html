@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="theme-color" content="#FFEFB3">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Opportunities | LinkUp</title>
+    <title>Opportunities | Linkzyfy</title>
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -161,7 +161,7 @@
             spanEvent.textContent = eventName;
 
             var spanBudget = document.createElement("span");
-            spanBudget.textContent = item.budget || "Budget on request";
+            spanBudget.textContent = formatBudget(item.budget) || "Budget on request";
 
             var spanAudience = document.createElement("span");
             spanAudience.textContent = item.audience || "Audience TBA";
@@ -199,7 +199,7 @@
             grid.appendChild(card);
         });
 
-        if (window.linkupUI) window.linkupUI.enhance(grid);
+        if (window.linkzyfyUI) window.linkzyfyUI.enhance(grid);
     }
 
     function applyFilter() {
@@ -241,7 +241,7 @@
         const displayName = getDisplayName(auth);
 
         document.getElementById("sidebarAvatar").textContent =
-            getInitials(fullName || "LinkUp User");
+            getInitials(fullName || "Linkzyfy User");
         document.getElementById("sidebarName").textContent =
             displayName;
         document.getElementById("sidebarRoleLabel").textContent =

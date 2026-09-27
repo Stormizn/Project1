@@ -4,14 +4,14 @@
     {
       "type": "msedge",
       "request": "launch",
-      "name": "Serve + open LinkUp (Edge)",
+      "name": "Serve + open Linkzyfy (Edge)",
       "url": "http://localhost:8080",
       "webRoot": "${workspaceFolder}"
     },
     {
       "type": "pwa-chrome",
       "request": "launch",
-      "name": "Serve + open LinkUp (Comet)",
+      "name": "Serve + open Linkzyfy (Comet)",
       "url": "http://localhost:8080",
       "webRoot": "${workspaceFolder}",
       "runtimeExecutable": "${env:LOCALAPPDATA}\\Perplexity\\Comet\\Application\\comet.exe"
@@ -19,14 +19,14 @@
   ],
   "compounds": [
     {
-      "name": "Serve + open LinkUp (Edge)",
-      "configurations": ["Serve + open LinkUp (Edge)"],
-      "preLaunchTask": "serve LinkUp"
+      "name": "Serve + open Linkzyfy (Edge)",
+      "configurations": ["Serve + open Linkzyfy (Edge)"],
+      "preLaunchTask": "serve Linkzyfy"
     },
     {
-      "name": "Serve + open LinkUp (Comet)",
-      "configurations": ["Serve + open LinkUp (Comet)"],
-      "preLaunchTask": "serve LinkUp"
+      "name": "Serve + open Linkzyfy (Comet)",
+      "configurations": ["Serve + open Linkzyfy (Comet)"],
+      "preLaunchTask": "serve Linkzyfy"
     }
   ]
 }

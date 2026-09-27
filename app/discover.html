@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="theme-color" content="#FFEFB3">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discover Events | LinkUp</title>
+    <title>Discover Events | Linkzyfy</title>
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -179,7 +179,7 @@
 
         <section class="dash-section" id="brandsSection" style="display: none;">
             <div class="section-header">
-                <h2>Brands on LinkUp</h2>
+                <h2>Brands on Linkzyfy</h2>
                 <div class="section-header-meta">
                     <span class="stamp stamp--live" id="brandCount">Loading&hellip;</span>
                 </div>
@@ -346,7 +346,7 @@
 
             var spanBudget = document.createElement("span");
             spanBudget.textContent =
-                item.budget ? "Budget: $" + item.budget : "Budget TBA";
+                item.budget ? "Budget: " + formatBudget(item.budget) : "Budget TBA";
 
             var spanAudience = document.createElement("span");
             spanAudience.textContent = item.audience || "Audience TBA";
@@ -499,7 +499,7 @@
         currentProfileId = profile.id;
 
         document.getElementById("sidebarAvatar").textContent =
-            getInitials(fullName || "LinkUp User");
+            getInitials(fullName || "Linkzyfy User");
         document.getElementById("sidebarName").textContent =
             displayName;
         document.getElementById("sidebarRoleLabel").textContent =
@@ -512,7 +512,7 @@
         document.getElementById("discoverDescription").textContent =
             profile.role === "event_planner"
                 ? "Browse the brands looking for partners, and see what other planners are running."
-                : "Find events and open opportunities from the LinkUp network.";
+                : "Find events and open opportunities from the Linkzyfy network.";
 
         // CREATE EVENT / OPPORTUNITY
     // Only event planners can publish, so this whole panel is

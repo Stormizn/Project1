@@ -1,4 +1,4 @@
-# AGENTS.md — working on LinkUp
+# AGENTS.md — working on Linkzyfy
 
 Read this first, then [`ROADMAP.md`](./ROADMAP.md) for current state and
 [`todos.md`](./todos.md) for the outstanding checklist.
@@ -106,6 +106,29 @@ accepted / rejected / withdrawn  -> final, no transitions out
 Adding a status to the `CHECK` without adding the transition to that
 function is how the two halves drift apart. Cover it in
 `scripts/verify-proposals.cjs` too.
+
+**A connection's `status` is the consent that unlocks a proposal, and
+only the recipient planner may set it.** `Brands can send proposals`
+requires the connection to be `accepted`, so *any* route a brand has to
+`accepted` is a route to filing an offer nobody agreed to. There are two
+obvious ones, and both were open until September 2026:
+
+- the INSERT policy must also require `status = 'pending'`
+- the UPDATE policies must be **role-scoped**, not
+  `auth.uid() = from_user OR auth.uid() = to_user`
+
+Which is to say: a brand is `from_user` on its own pending row, so a
+generic "you may update your own connections" policy lets it set
+`accepted` itself. The UI never does this — there is no button — which
+is exactly why it has to be the database's job. When you touch these
+policies, keep the two roles apart and keep the `USING` status list
+narrow, because `USING` is what makes `rejected` and `archived`
+terminal.
+
+`scripts/verify-rls-live.mjs --full` asserts both routes, each with a
+control beside it. If you add a check that refuses an INSERT, give it a
+**fresh opportunity** — `refuses()` accepts any 4xx, so hitting the
+unique index (`23505`) instead of RLS would pass vacuously.
 
 **`auth.users` cannot be deleted from the browser.** It is owned by
 `supabase_auth_admin` and the `authenticated` role has no `DELETE` on it.

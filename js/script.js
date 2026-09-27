@@ -1,7 +1,7 @@
-// LinkUp — shared UI motion (no database code here)
+// Linkzyfy — shared UI motion (no database code here)
 //
-// Everything here is exposed on `window.linkupUI` as well, because a
-// lot of LinkUp's markup is built by JavaScript AFTER this file runs.
+// Everything here is exposed on `window.linkzyfyUI` as well, because a
+// lot of Linkzyfy's markup is built by JavaScript AFTER this file runs.
 //
 // The bug this guards against: CSS sets `.js [data-reveal] { opacity: 0 }`
 // so that content fades in on scroll. If a card is created later (a
@@ -154,7 +154,7 @@
         tiltNodes.forEach(tiltNode);
     }
 
-    window.linkupUI = {
+    window.linkzyfyUI = {
         enhance: enhance,
         reveal: revealNode,
         showAll: function () {
@@ -190,7 +190,7 @@
     }
 
     window.addEventListener("beforeprint", function () {
-        window.linkupUI.showAll();
+        window.linkzyfyUI.showAll();
     });
 
     // ---- Header hairline once scrolled ---------------------------------
@@ -218,7 +218,7 @@
             ticking = false;
         };
 
-        if (window._linkupParallaxCleanup) window._linkupParallaxCleanup();
+        if (window._linkzyfyParallaxCleanup) window._linkzyfyParallaxCleanup();
 
         var onScroll = function () {
             if (!ticking) { ticking = true; window.requestAnimationFrame(update); }
@@ -227,7 +227,7 @@
         window.addEventListener("scroll", onScroll, { passive: true });
         update();
 
-        window._linkupParallaxCleanup = function () {
+        window._linkzyfyParallaxCleanup = function () {
             window.removeEventListener("scroll", onScroll);
         };
     }

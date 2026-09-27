@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "serve LinkUp",
+      "label": "serve Linkzyfy",
       "type": "process",
       "command": "node",
       "args": ["scripts/serve.mjs", "8080"],
@@ -10,7 +10,7 @@
       "presentation": { "reveal": "silent", "panel": "dedicated" },
       "problemMatcher": [
         {
-          "owner": "linkup-serve",
+          "owner": "linkzyfy-serve",
           "pattern": {
             "regexp": "^$",
             "file": 1,
@@ -19,7 +19,7 @@
           },
           "background": {
             "activeOnStart": true,
-            "beginsPattern": "^LinkUp dev server",
+            "beginsPattern": "^Linkzyfy dev server",
             "endsPattern": "^press ctrl\\+c to stop$"
           }
         }

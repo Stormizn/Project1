@@ -1,5 +1,5 @@
 // ==========================================
-// LINKUP SUPABASE CONFIG
+// LINKZYFY SUPABASE CONFIG
 // ==========================================
 //
 // This file initializes the shared Supabase client used

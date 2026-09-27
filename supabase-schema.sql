@@ -1,5 +1,5 @@
 -- =========================================================
--- LINKUP — FULL SCHEMA (fresh install)
+-- LINKZYFY — FULL SCHEMA (fresh install)
 -- =========================================================
 -- Run this once in the Supabase SQL Editor for a NEW project.
 --
@@ -339,7 +339,7 @@ ALTER TABLE public.connections ENABLE ROW LEVEL SECURITY;
 
 -- Signed-in users can read profiles.
 --
--- This stays open on purpose: LinkUp is a public marketplace
+-- This stays open on purpose: Linkzyfy is a public marketplace
 -- directory, and Discover / Connections / Opportunity pages all
 -- join in OTHER users' profiles (organizer name, brand name) to
 -- render a card. The table deliberately holds no email, phone or
@@ -442,12 +442,44 @@ CREATE POLICY "Brands can send interest"
         AND o.organizer_id = to_user
         AND o.status = 'open'
     )
+    -- A new connection always starts pending. Without this a brand
+    -- could INSERT the row already marked `accepted` and skip the
+    -- handshake the whole feature depends on. See the UPDATE policies
+    -- below for the other route to the same place.
+    AND status = 'pending'
   );
 
-CREATE POLICY "Users can update their own connections"
+-- Who may move a connection to which status.
+--
+-- The old policy was `auth.uid() = from_user OR auth.uid() = to_user`
+-- with no mention of `status`, which meant a brand could UPDATE its
+-- own pending row straight to `accepted`. Since `Brands can send
+-- proposals` only requires that the connection be accepted, that let a
+-- brand manufacture consent and file a proposal the planner had never
+-- agreed to. RLS decides *who* may touch a row; these two policies are
+-- where *which statuses* gets decided, mirroring `proposals`.
+--
+-- RLS cannot compare the new row against the old one, so it cannot stop
+-- a party repointing `from_user` / `opportunity_id` on a row it is
+-- already party to. That is a much smaller problem than forged
+-- consent, and it is noted rather than papered over.
+CREATE POLICY "Recipients can respond to interest"
   ON public.connections FOR UPDATE
-  USING (auth.uid() = from_user OR auth.uid() = to_user)
-  WITH CHECK (auth.uid() = from_user OR auth.uid() = to_user);
+  USING (
+    auth.uid() = to_user
+    AND status IN ('pending', 'accepted')
+  )
+  WITH CHECK (
+    auth.uid() = to_user
+    AND status IN ('accepted', 'rejected', 'archived')
+  );
+
+-- A brand may withdraw its own interest, and nothing else. It cannot
+-- reach `accepted` or `rejected`: only the planner's decision does that.
+CREATE POLICY "Senders can archive their own interest"
+  ON public.connections FOR UPDATE
+  USING (auth.uid() = from_user)
+  WITH CHECK (auth.uid() = from_user AND status = 'archived');
 
 CREATE POLICY "Users can delete their own connections"
   ON public.connections FOR DELETE

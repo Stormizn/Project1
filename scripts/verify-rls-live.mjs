@@ -32,7 +32,7 @@
 // the things under test. Emails use the reserved .invalid TLD, so no
 // message can ever be delivered to a stranger.
 //
-// If it crashes, leftovers are named linkup-rls-* and are safe to
+// If it crashes, leftovers are named linkzyfy-rls-* and are safe to
 // delete from the Supabase dashboard. Preflight writes nothing.
 
 import { readFileSync } from 'node:fs';
@@ -144,7 +144,7 @@ if (!FULL && !CLEANUP) {
 const FULL_RUN_HEADER = '\n=== live session tests (this writes to the real database) ===';
 
 const stamp = Date.now();
-const PASSWORD = 'LinkupRlsProbe-2026';
+const PASSWORD = 'LinkzyfyRlsProbe-2026';
 // The local part is keyed on the LABEL, never on the role. Two of the
 // three accounts are brands, and keying on the role handed them the
 // same address -- so the "unrelated outsider" was silently the same
@@ -156,7 +156,7 @@ const PASSWORD = 'LinkupRlsProbe-2026';
 // column and every signed-in user may read every profile, so a test
 // account is findable by name alone, which is what --cleanup needs.
 const acct = (label) => ({
-  email: `linkup-rls-${label}-${stamp}@linkup-test.invalid`,
+  email: `linkzyfy-rls-${label}-${stamp}@linkzyfy-test.invalid`,
   password: PASSWORD,
 });
 
@@ -202,22 +202,36 @@ if (CLEANUP) {
   if (!aud) { console.log('\ncould not create the auditor account. Stopping.'); process.exit(2); }
 
   const everyone = await rest('users', { query: 'select=id,name,role', token: aud.token });
-  const leftovers = rows(everyone).filter((u) => /^(linkup-rls-|probe-)/.test(u.name || ''));
+  // `linkup-rls-` is matched alongside the current prefix on purpose:
+  // this file was renamed, but probe accounts created before the rename
+  // are still sitting in the live database under the old name and the
+  // old @linkup-test.invalid domain. Dropping the old pattern would
+  // strand them permanently.
+  const leftovers = rows(everyone).filter((u) => /^(linkzyfy-rls-|linkup-rls-|probe-)/.test(u.name || ''));
 
   if (!leftovers.length) {
     info('no leftover test accounts found');
   } else {
     for (const u of leftovers) {
       if (u.id === aud.id) continue; // the auditor removes itself below
-      const email = `${u.name}@linkup-test.invalid`;
-      const s = await call('/auth/v1/token?grant_type=password', {
-        method: 'POST', body: { email, password: PASSWORD },
-      });
-      if (s.status >= 400) { fail(`could not sign in as leftover ${email} (${s.status})`); continue; }
-      const d = await call('/rest/v1/rpc/delete_account', { method: 'POST', token: s.json.access_token, body: {} });
-      d.status < 400
-        ? pass(`removed leftover ${email}`)
-        : fail(`delete_account() for ${email} -> ${d.status} ${d.text.slice(0, 160)}`);
+      let removed = false;
+      for (const domain of ['linkzyfy-test.invalid', 'linkup-test.invalid']) {
+        if (removed) break;
+        const email = `${u.name}@${domain}`;
+        const s = await call('/auth/v1/token?grant_type=password', {
+          method: 'POST', body: { email, password: PASSWORD },
+        });
+        if (s.status >= 400) continue; // wrong domain, or gone already
+        const d = await call('/rest/v1/rpc/delete_account', { method: 'POST', token: s.json.access_token, body: {} });
+        if (d.status < 400) {
+          pass(`removed leftover ${email}`);
+          removed = true;
+        } else {
+          fail(`could not delete leftover ${email} -> ${d.status} ${d.text.slice(0, 200)}`);
+          removed = true;
+        }
+      }
+      if (!removed) fail(`could not sign in as leftover ${u.name} on either test domain`);
     }
   }
 
@@ -240,7 +254,7 @@ const P = await signUp('planner', 'event_planner'); // the planner reviewing it
 const B = await signUp('outsider', 'brand');   // a second brand, in no connection
 if (!A || !P || !B) {
   console.log('\nCould not create the three accounts. Stopping.');
-  console.log('Any that were created are named linkup-rls-* and can be removed with --cleanup.');
+  console.log('Any that were created are named linkzyfy-rls-* and can be removed with --cleanup.');
   process.exit(2);
 }
 if (A.id === B.id || A.email === B.email) {
@@ -348,6 +362,69 @@ await refuses('interest cannot name a planner who does not own the opportunity',
     body: { from_user: A.id, to_user: B.id, opportunity_id: opp1.id },
   }));
 
+// ------------------------------------------- connections: forged consent
+// "Brands can send proposals" only requires that the connection be
+// accepted, so ANY route a brand has to `accepted` is a route to filing
+// a proposal the planner never agreed to. There used to be two: the
+// INSERT policy never checked `status`, and the UPDATE policy let
+// either party write any status on a row they were already party to.
+//
+// Every refused INSERT below uses a fresh opportunity. `refuses()`
+// accepts any 4xx, so hitting the unique index (23505) instead of RLS
+// would pass vacuously -- the exact failure this file exists to avoid.
+const opp4 = await allows('planner can publish a fourth opportunity', () => opp(4));
+
+await refuses('a brand cannot INSERT a connection already marked accepted', () =>
+  rest('connections', {
+    method: 'POST', token: A.token,
+    body: { from_user: A.id, to_user: P.id, opportunity_id: opp4.id, status: 'accepted' },
+  }));
+
+const conn4 = await allows('CONTROL: the same insert with status pending succeeds (so the rule is the status, not a broken table)', () =>
+  rest('connections', {
+    method: 'POST', token: A.token,
+    body: { from_user: A.id, to_user: P.id, opportunity_id: opp4.id, status: 'pending' },
+  }));
+
+await refuses('a brand cannot UPDATE their own pending connection to accepted', () =>
+  rest('connections', {
+    method: 'PATCH', token: A.token, query: 'id=eq.' + conn2.id, body: { status: 'accepted' },
+  }));
+
+await refuses('a brand cannot mark their own connection rejected', () =>
+  rest('connections', {
+    method: 'PATCH', token: A.token, query: 'id=eq.' + conn2.id, body: { status: 'rejected' },
+  }));
+
+// The control that makes the two refusals above mean something. This is
+// the accept that later tests reuse.
+await allows('CONTROL: the planner can accept that same connection', () =>
+  rest('connections', {
+    method: 'PATCH', token: P.token, query: 'id=eq.' + conn2.id, body: { status: 'accepted' },
+  }));
+
+await allows('CONTROL: the planner can reject the fourth interest', () =>
+  rest('connections', {
+    method: 'PATCH', token: P.token, query: 'id=eq.' + conn4.id, body: { status: 'rejected' },
+  }));
+
+await refuses('rejected is final: the planner cannot reopen it as accepted', () =>
+  rest('connections', {
+    method: 'PATCH', token: P.token, query: 'id=eq.' + conn4.id, body: { status: 'accepted' },
+  }));
+
+await refuses('rejected is final: the brand cannot reopen it either', () =>
+  rest('connections', {
+    method: 'PATCH', token: A.token, query: 'id=eq.' + conn4.id, body: { status: 'accepted' },
+  }));
+
+// A brand's one permitted write is withdrawing its own interest. The UI
+// does not offer this yet, so nothing would catch this regressing.
+await allows('CONTROL: a brand can archive their own interest', () =>
+  rest('connections', {
+    method: 'PATCH', token: A.token, query: 'id=eq.' + conn4.id, body: { status: 'archived' },
+  }));
+
 const dup = await call('/rest/v1/connections', {
   method: 'POST', token: A.token, prefer: 'return=representation',
   body: { from_user: A.id, to_user: P.id, opportunity_id: opp1.id },
@@ -424,9 +501,8 @@ await refuses('accepted is final and cannot be reopened as proposed', () =>
 await refuses('accepted cannot be changed to changes_requested', () =>
   rest('proposals', { method: 'PATCH', token: P.token, query: 'id=eq.' + prop2.id, body: { status: 'changes_requested' } }));
 
-// changes_requested -> proposed is the one legal way back, for the brand
-const conn4row = await allows('brand sends interest on a fourth connection is not needed; reusing conn2 after accepting it', () =>
-  rest('connections', { method: 'PATCH', token: P.token, query: 'id=eq.' + conn2.id, body: { status: 'accepted' } }));
+// changes_requested -> proposed is the one legal way back, for the brand.
+// conn2 was already accepted by the CONTROL in the connections section.
 const prop3 = await allows('brand sends a third proposal', () =>
   rest('proposals', {
     method: 'POST', token: A.token,

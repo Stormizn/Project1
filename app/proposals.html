@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="theme-color" content="#FFEFB3">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proposals | LinkUp</title>
+    <title>Proposals | Linkzyfy</title>
     <script>document.documentElement.classList.add("js");</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -140,9 +140,9 @@
     }
 
     function partyName(party) {
-        if (!party) return "LinkUp member";
+        if (!party) return "Linkzyfy member";
         var name = (party.name || "").trim();
-        return name || "LinkUp member";
+        return name || "Linkzyfy member";
     }
 
     // The opportunity the proposal grew out of, when the connection has
@@ -325,7 +325,7 @@
         if (!profile) {
             showFatal(
                 "Your profile could not be loaded",
-                "We could not read your LinkUp profile, so there is nothing to show. " +
+                "We could not read your Linkzyfy profile, so there is nothing to show. " +
                 "Check your connection and reload the page."
             );
             console.error("Proposals: profile unavailable", auth.error);
@@ -336,7 +336,7 @@
 
         var fullName = profile.name ? profile.name.trim() : "";
         document.getElementById("sidebarAvatar").textContent =
-            getInitials(fullName || "LinkUp User");
+            getInitials(fullName || "Linkzyfy User");
         document.getElementById("sidebarName").textContent = getDisplayName(auth);
         document.getElementById("sidebarRoleLabel").textContent =
             isPlanner() ? "Event Planner Account" : "Brand Account";

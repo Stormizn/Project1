@@ -201,11 +201,11 @@ function loadPage(which, opts = {}) {
     formatDateTime: () => 'then',
     plural: (n, s, p) => n + ' ' + (n === 1 ? s : (p || s + 's')),
     // Silenced by default, because the pages log on paths a test drives
-    // deliberately. LINKUP_VERBOSE=1 surfaces them when a check fails.
+    // deliberately. LINKZYFY_VERBOSE=1 surfaces them when a check fails.
     console: {
-      log: (...a) => process.env.LINKUP_VERBOSE && console.log('   [page]', ...a),
-      warn: (...a) => process.env.LINKUP_VERBOSE && console.warn('   [page]', ...a),
-      error: (...a) => process.env.LINKUP_VERBOSE && console.error('   [page]', ...a),
+      log: (...a) => process.env.LINKZYFY_VERBOSE && console.log('   [page]', ...a),
+      warn: (...a) => process.env.LINKZYFY_VERBOSE && console.warn('   [page]', ...a),
+      error: (...a) => process.env.LINKZYFY_VERBOSE && console.error('   [page]', ...a),
     },
     URLSearchParams,
     requireSession: async () => ({

@@ -1,6 +1,6 @@
 # Supabase 24/7 Hosting Guide
 
-Vercel is fantastic for hosting the frontend (HTML/CSS/JS) of LinkUp. However, because Vercel is "serverless", it cannot host a permanent database like PocketBase natively without paying for expensive 24/7 containers elsewhere.
+Vercel is fantastic for hosting the frontend (HTML/CSS/JS) of Linkzyfy. However, because Vercel is "serverless", it cannot host a permanent database like PocketBase natively without paying for expensive 24/7 containers elsewhere.
 
 **Supabase** is an open-source Firebase alternative based on PostgreSQL. It is natively supported by Vercel, perfect for serverless environments, and has a very generous **100% free tier that does NOT require a credit card**.
 
@@ -10,13 +10,13 @@ Follow these steps to set up your free Supabase backend:
 1. Go to [Supabase.com](https://supabase.com/) and click **Start your project**.
 2. Sign in with GitHub or your email (no credit card required).
 3. Click **New Project** and select a default organization.
-4. Name your project (e.g., `linkup-db`), generate a secure password (save it somewhere just in case), and choose a region close to you.
+4. Name your project (e.g., `linkzyfy-db`), generate a secure password (save it somewhere just in case), and choose a region close to you.
 5. Click **Create new project**. It will take about 2-3 minutes to set up your database.
 
 ## Step 2: Disable Email Confirmations (Recommended)
 By default, Supabase requires users to confirm their email before they can log in.
 
-LinkUp works either way — the `handle_new_user()` database trigger creates the
+Linkzyfy works either way — the `handle_new_user()` database trigger creates the
 user's profile regardless of whether a session exists — so this is about demo
 convenience rather than correctness. Turning it off means a brand or planner can
 sign up and sign in straight away, with no inbox round-trip.
@@ -41,7 +41,7 @@ Running the wrong one will fail — the full schema uses `CREATE TABLE` without
 
 1. Once your project is ready, look at the left sidebar menu in the Supabase Dashboard and click on **SQL Editor** (the `{}` icon).
 2. Click **New Query**.
-3. Open the correct `.sql` file from your LinkUp repository.
+3. Open the correct `.sql` file from your Linkzyfy repository.
 4. Copy all the text inside it.
 5. Paste it into the Supabase SQL Editor.
 6. Click the green **Run** button at the bottom right. You should see a "Success" message.
@@ -98,7 +98,7 @@ We need to connect your frontend code to this new database.
 3. You will see your **Project URL** (e.g., `https://xyz.supabase.co`). Copy it.
 4. Below that, in the "Project API keys" section, you will see your **`anon` / `public`** key. Copy it as well. *(Never copy the `service_role` key).*
 
-## Step 5: Connect LinkUp
+## Step 5: Connect Linkzyfy
 1. Open `js/supabase.js` in your code editor.
 2. Set `SUPABASE_URL` to the Project URL you copied.
 3. Set `SUPABASE_ANON_KEY` to the `anon` / publishable key you copied.
@@ -117,7 +117,7 @@ node scripts/serve.mjs
 ```
 
 Then open <http://localhost:8080>. No `npm install` is needed — the server uses
-only Node built-ins. In VS Code, press **F5** and choose "Serve + open LinkUp"
+only Node built-ins. In VS Code, press **F5** and choose "Serve + open Linkzyfy"
 to start the server and launch Chrome in one step.
 
 ## Step 7: Deploy to Vercel

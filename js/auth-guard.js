@@ -1,5 +1,5 @@
 // ==========================================
-// LINKUP AUTH GUARD
+// LINKZYFY AUTH GUARD
 // ==========================================
 //
 // Shared helpers for private pages
@@ -84,7 +84,7 @@ function profileFromMetadata(user) {
 
     return {
         id: user.id,
-        name: name || "LinkUp User",
+        name: name || "Linkzyfy User",
         role: role,
         organization_name: clean(meta.organization_name),
         location: clean(meta.location),
@@ -236,7 +236,7 @@ function watchSessionExpiry() {
 
 function getInitials(fullName) {
 
-    var name = fullName || "LinkUp";
+    var name = fullName || "Linkzyfy";
 
     return name
         .split(" ")
@@ -251,7 +251,7 @@ function getInitials(fullName) {
 
 function getDisplayName(auth, fallback) {
 
-    var defaultName = fallback || "LinkUp User";
+    var defaultName = fallback || "Linkzyfy User";
 
     if (!auth) return defaultName;
 

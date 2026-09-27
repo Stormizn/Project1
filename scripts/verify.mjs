@@ -54,8 +54,10 @@ for (const f of htmls) {
 deadRefs.length ? deadRefs.forEach(fail) : pass(`${refs} local refs all resolve`);
 
 // ------------------------------------------- 2. per-page inline JS + ids
-const tmp = mkdtempSync(join(tmpdir(), 'linkup-verify-'));
+const tmp = mkdtempSync(join(tmpdir(), 'linkzyfy-verify-'));
 let inlineScripts = 0;
+let inlineParsed = 0;
+let inlineBroken = 0;
 for (const f of htmls) {
   const html = readFileSync(f, 'utf8');
   const rel = basename(f);
@@ -68,7 +70,9 @@ for (const f of htmls) {
     writeFileSync(p, m[1]);
     try {
       execFileSync('node', ['--check', p], { stdio: 'pipe' });
+      inlineParsed++;
     } catch (e) {
+      inlineBroken++;
       fail(`${rel} inline script ${i} does not parse: ${String(e.stderr || e).split('\n')[0]}`);
     }
   });
@@ -87,7 +91,15 @@ for (const f of htmls) {
   const dupes = [...new Set(all.filter((v, i) => all.indexOf(v) !== i))];
   dupes.length ? fail(`${rel} duplicate ids: ${dupes.join(', ')}`) : null;
 }
-pass(`${inlineScripts} inline scripts parse`);
+// Only claim a clean sweep when every script really did parse. An
+// unconditional "N inline scripts parse" is a false pass in waiting:
+// the individual FAIL lines scroll past and the summary still reads
+// like a clean run.
+if (inlineBroken === 0) {
+  pass(`${inlineParsed} inline scripts parse`);
+} else {
+  console.log(`  --    ${inlineParsed} of ${inlineScripts} inline scripts parse (${inlineBroken} failed above)`);
+}
 
 // ------------------------------------------------------------- 3. the CSS
 const cssPath = join(root, 'css/style.css');
